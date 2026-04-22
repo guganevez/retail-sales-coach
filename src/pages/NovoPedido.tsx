@@ -66,7 +66,7 @@ const NovoPedido = () => {
   const capacityRemaining = logistics.capacityKg - logistics.scheduledKg;
   const capacityWarning = totals.weightKg > capacityRemaining;
 
-  function addProduct(productId: string) {
+  function addProduct(productId: string, atPrice?: number) {
     setItems(prev => {
       const existing = prev.find(i => i.productId === productId);
       const p = productMap[productId];
@@ -76,10 +76,32 @@ const NovoPedido = () => {
       return [...prev, {
         productId,
         qty: 1,
-        price: prices[productId] || p.psv,
+        price: atPrice ?? prices[productId] ?? p.psv,
         lastPrice: prices[productId],
       }];
     });
+  }
+
+  // Auto-correção de preço pelo painel de bloqueios
+  function fixItemPrice(productId: string, newPrice: number) {
+    setItems(prev => prev.map(i => i.productId === productId ? { ...i, price: newPrice } : i));
+    const p = productMap[productId];
+    toast.success(`Preço de ${p?.name ?? "item"} ajustado para ${formatBRL(newPrice)}`);
+  }
+
+  // Sugere o melhor substituto de maior margem na mesma categoria
+  function suggestSubstitute(productId: string) {
+    const p = productMap[productId];
+    if (!p) return;
+    const candidate = products
+      .filter(x => x.id !== productId && x.category === p.category)
+      .sort((a, b) => itemMarginPct(b.psv, b.cost) - itemMarginPct(a.psv, a.cost))[0];
+    if (!candidate) {
+      toast.info("Sem substituto disponível na mesma categoria.");
+      return;
+    }
+    addProduct(candidate.id);
+    toast.success(`Substituto sugerido: ${candidate.name}`);
   }
 
   // Auto-add se veio um produto da busca universal
@@ -157,6 +179,25 @@ const NovoPedido = () => {
 
   function confirmSubmit() {
     if (!client || !exportPayload) return;
+
+    // Validação BLOQUEANTE: assinatura + recebedor obrigatórios para entregas
+    if (requiresSignature) {
+      const missingSig = !signature;
+      const missingName = signedBy.trim().length < 2;
+      if (missingSig || missingName) {
+        setShowSignatureError(true);
+        const what = missingSig && missingName
+          ? "assinatura e nome do recebedor"
+          : missingSig ? "assinatura do recebedor" : "nome do recebedor";
+        toast.error(`Não é possível confirmar: faltando ${what}.`);
+        // Rola até a seção de assinatura
+        setTimeout(() => {
+          document.getElementById("signature-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
+        return;
+      }
+    }
+
     // Sempre persiste para a lista de "orçamentos/pedidos"
     addQuote({
       clientId: client.id,
@@ -173,8 +214,25 @@ const NovoPedido = () => {
       signedBy: signedBy || undefined,
       isOrder: !isQuote,
     });
+    clearDraft();
     setStep("confirmed");
   }
+
+  // ============ AUTO-SAVE EM MEMÓRIA ============
+  const firstSaveSkip = useRef(true);
+  useEffect(() => {
+    // Não salva enquanto está mostrando confirmação
+    if (step === "confirmed") return;
+    // Pula a primeira passagem (carregamento) para evitar sobrescrever ao retomar
+    if (firstSaveSkip.current) {
+      firstSaveSkip.current = false;
+      return;
+    }
+    saveDraft({
+      clientId, items, orderType, shift, paymentTerm, validUntil, signedBy, signature,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, items, orderType, shift, paymentTerm, validUntil, signedBy, signature, step]);
 
   // ============ TELA DE CONFIRMAÇÃO ============
   if (step === "confirmed" && client && exportPayload) {

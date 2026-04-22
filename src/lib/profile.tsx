@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, ReactNode } from "react";
-import { manager, supervisors, reps, SalesRep, SupervisorNode } from "./team";
+import { manager, supervisors, reps, SalesRep, SupervisorNode, getRep, getSupervisor } from "./team";
 
 export type Role = "vendedor" | "supervisor" | "gerente";
 

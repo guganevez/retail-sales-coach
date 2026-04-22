@@ -1,9 +1,10 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown, Truck } from "lucide-react";
+import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown, Truck, Check } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 import { smartAlerts } from "@/lib/mock";
 import { useProfile, ROLE_LABEL, Role } from "@/lib/profile";
+import { reps, supervisors } from "@/lib/team";
 import { UniversalSearch } from "./UniversalSearch";
 
 interface Props {

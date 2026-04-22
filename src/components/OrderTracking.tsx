@@ -81,6 +81,9 @@ export function OrderTracking({ order, compact }: Props) {
 
   return (
     <article className="space-y-4">
+      {/* Resumo ETA + proximidade (atualiza com mudança de status) */}
+      <EtaSummary order={order} />
+
       {/* Header status */}
       <div className="rounded-2xl bg-card p-4 shadow-soft">
         <div className="flex items-center justify-between gap-2">

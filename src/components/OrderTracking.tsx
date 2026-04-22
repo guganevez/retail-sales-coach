@@ -6,6 +6,8 @@ import {
 } from "@/lib/tracking";
 import { formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { TrackingMap } from "./TrackingMap";
+import { EtaSummary } from "./EtaSummary";
 
 interface Props {
   order: TrackedOrder;
@@ -79,6 +81,9 @@ export function OrderTracking({ order, compact }: Props) {
 
   return (
     <article className="space-y-4">
+      {/* Resumo ETA + proximidade (atualiza com mudança de status) */}
+      <EtaSummary order={order} />
+
       {/* Header status */}
       <div className="rounded-2xl bg-card p-4 shadow-soft">
         <div className="flex items-center justify-between gap-2">
@@ -130,6 +135,11 @@ export function OrderTracking({ order, compact }: Props) {
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
           <MapPin className="h-4 w-4 text-primary" /> Localização
         </h3>
+
+        {/* Mini-mapa CD / cliente / veículo */}
+        <div className="mt-3">
+          <TrackingMap order={order} />
+        </div>
 
         <div className="mt-3 space-y-3">
           <Row icon={<Truck className="h-4 w-4" />} label="Origem (CD)">

@@ -44,7 +44,12 @@ const Painel = () => {
     viewSupervisor = supervisors.find(s => s.id === supId)!;
   } else {
     // gerente
-    if (selectedSupervisorId) {
+    if (selectedRepId) {
+      kpis = kpisForRep(selectedRepId);
+      const r = reps.find(x => x.id === selectedRepId)!;
+      label = `${r.name} · ${r.region}`;
+      viewSupervisor = supervisors.find(s => s.id === r.supervisorId)!;
+    } else if (selectedSupervisorId) {
       kpis = kpisForSupervisor(selectedSupervisorId);
       const sup = supervisors.find(s => s.id === selectedSupervisorId)!;
       label = sup.team;
@@ -57,9 +62,11 @@ const Painel = () => {
 
   // Ranking geral (sempre disponível p/ supervisor e gerente)
   const ranking = role === "gerente"
-    ? (selectedSupervisorId
-        ? viewSupervisor!.reps
-        : [...reps].sort((a, b) => b.sold - a.sold))
+    ? (selectedRepId
+        ? [reps.find(r => r.id === selectedRepId)!]
+        : selectedSupervisorId
+          ? viewSupervisor!.reps
+          : [...reps].sort((a, b) => b.sold - a.sold))
     : role === "supervisor"
       ? viewSupervisor!.reps
       : [];
@@ -119,6 +126,38 @@ const Painel = () => {
               );
             })}
           </div>
+
+          {/* Drill-down: vendedores do supervisor selecionado */}
+          {selectedSupervisorId && viewSupervisor && (
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase text-muted-foreground">Vendedores da equipe</p>
+                {selectedRepId && (
+                  <button
+                    onClick={() => setSelectedRepId(null)}
+                    className="text-[10px] font-bold text-primary"
+                  >
+                    Limpar seleção
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {viewSupervisor.reps.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRepId(selectedRepId === r.id ? null : r.id)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                      selectedRepId === r.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                    )}
+                  >
+                    <UserCircle2 className="mr-1 inline h-3 w-3" />
+                    {r.name.split(" ")[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

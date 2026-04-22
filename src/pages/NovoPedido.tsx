@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Search, X, Plus, Minus, Sparkles, Truck, Package, FileText,
   AlertTriangle, ShieldAlert, CheckCircle2, Repeat, ChevronRight, Tag,
+  CalendarClock, Download, FileDown, MessageCircle, PenLine, ArrowRight, Eye,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ClientStatusBadge } from "@/components/ClientStatusBadge";
 import { HealthPill, HealthDot } from "@/components/HealthDot";
+import { SignaturePad } from "@/components/SignaturePad";
 import {
   clients, formatBRL, formatPct, frequentByClient, lastPriceMap,
   logistics, products, recentOrders,
@@ -14,20 +16,39 @@ import {
 import { OrderItem, OrderType, Shift } from "@/lib/types";
 import { computeTotals, marginHealth, priceHealth, itemMarginPct } from "@/lib/calc";
 import { cn } from "@/lib/utils";
+import { useQuotes } from "@/lib/quotes";
+import { useProfile } from "@/lib/profile";
+import { exportCSV, exportPDF, shareWhatsApp } from "@/lib/exports";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
+type Step = "edit" | "review" | "confirmed";
+
 const NovoPedido = () => {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const { addQuote } = useQuotes();
+  const { profile } = useProfile();
+
   const preselected = params.get("cliente");
+  const initialType = (params.get("tipo") as OrderType) || "entrega";
+  const preselectedProduct = params.get("produto");
+
   const [clientId, setClientId] = useState<string | null>(preselected);
   const [pickerOpen, setPickerOpen] = useState(!preselected);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>("entrega");
+  const [orderType, setOrderType] = useState<OrderType>(initialType);
   const [shift, setShift] = useState<Shift>("manha");
   const [paymentTerm, setPaymentTerm] = useState("28 dias");
-  const [confirmed, setConfirmed] = useState(false);
+  const [step, setStep] = useState<Step>("edit");
+  const [signature, setSignature] = useState<string | undefined>();
+  const [signedBy, setSignedBy] = useState("");
+  const [validUntil, setValidUntil] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 15);
+    return d.toISOString().slice(0, 10);
+  });
 
   const client = clients.find(c => c.id === clientId) || null;
   const prices = client ? (lastPriceMap[client.id] || {}) : {};
@@ -53,6 +74,14 @@ const NovoPedido = () => {
     });
   }
 
+  // Auto-add se veio um produto da busca universal
+  useEffect(() => {
+    if (preselectedProduct && client && !items.find(i => i.productId === preselectedProduct)) {
+      addProduct(preselectedProduct);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedProduct, client]);
+
   function updateQty(productId: string, delta: number) {
     setItems(prev => prev
       .map(i => i.productId === productId ? { ...i, qty: Math.max(0, i.qty + delta) } : i)
@@ -74,7 +103,7 @@ const NovoPedido = () => {
     setItems(last.items.map(i => ({ ...i, lastPrice: i.price })));
   }
 
-  // Smart suggestions: produtos frequentes não no pedido + promoções
+  // Smart suggestions
   const suggestions = useMemo(() => {
     if (!client) return [];
     const inOrder = new Set(items.map(i => i.productId));
@@ -84,7 +113,6 @@ const NovoPedido = () => {
     const promos = products
       .filter(p => p.promo && !inOrder.has(p.id) && !freq.find(f => f.product.id === p.id))
       .map(p => ({ product: p, reason: "Em promoção" as const }));
-    // recover margin: produtos de alta margem
     const recover = totals.marginPct < 5 && totals.gross > 0
       ? products
         .filter(p => !inOrder.has(p.id) && itemMarginPct(p.psv, p.cost) > 25)
@@ -103,24 +131,83 @@ const NovoPedido = () => {
   }
   if (totals.blocked) alerts.push({ sev: "danger", msg: "Margem inferior a -3%: pedido bloqueado pela política comercial." });
   else if (totals.marginPct < 2 && items.length > 0) alerts.push({ sev: "warning", msg: "Margem do pedido está baixa. Considere ajustar preços." });
-  if (capacityWarning) alerts.push({ sev: "warning", msg: `Pedido excede a capacidade do dia (${(totals.weightKg).toFixed(0)}kg de ${capacityRemaining}kg disponíveis).` });
+  if (capacityWarning && orderType === "entrega") alerts.push({ sev: "warning", msg: `Pedido excede a capacidade do dia (${(totals.weightKg).toFixed(0)}kg de ${capacityRemaining}kg disponíveis).` });
   if (items.length > 0 && totals.itemsCount < 6 && totals.marginPct < 6) alerts.push({ sev: "info", msg: "Pedido pequeno e com baixa rentabilidade — sugira combos." });
 
-  if (confirmed) {
+  const canSubmit = client && items.length > 0 && !totals.blocked && client.status !== "bloqueado";
+  const isQuote = orderType === "orcamento";
+  const requiresSignature = orderType === "entrega";
+
+  const exportPayload = client ? {
+    client, items, productMap, totals,
+    type: orderType, paymentTerm, shift,
+    validUntil: isQuote ? new Date(validUntil + "T23:59:59").toISOString() : undefined,
+    signatureDataUrl: signature, signedBy: signedBy || undefined,
+    salesperson: profile.name,
+    isQuote,
+  } : null;
+
+  function confirmSubmit() {
+    if (!client || !exportPayload) return;
+    // Sempre persiste para a lista de "orçamentos/pedidos"
+    addQuote({
+      clientId: client.id,
+      items,
+      type: orderType,
+      shift,
+      paymentTerm,
+      totalGross: totals.gross,
+      marginPct: totals.marginPct,
+      commissionValue: totals.commissionValue,
+      validUntil: isQuote ? new Date(validUntil + "T23:59:59").toISOString() : new Date().toISOString(),
+      status: isQuote ? "enviado" : "aceito",
+      signatureDataUrl: signature,
+      signedBy: signedBy || undefined,
+      isOrder: !isQuote,
+    });
+    setStep("confirmed");
+  }
+
+  // ============ TELA DE CONFIRMAÇÃO ============
+  if (step === "confirmed" && client && exportPayload) {
     return (
       <MobileShell hideTopBar>
-        <div className="flex min-h-[80vh] flex-col items-center justify-center text-center">
+        <div className="flex min-h-[80vh] flex-col items-center text-center pt-10">
           <div className="grid h-20 w-20 place-items-center rounded-full bg-success-soft text-success">
             <CheckCircle2 className="h-10 w-10" />
           </div>
-          <h2 className="mt-4 text-xl font-bold">Pedido enviado!</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Cliente: {client?.fantasy}</p>
+          <h2 className="mt-4 text-xl font-bold">{isQuote ? "Orçamento enviado!" : "Pedido confirmado!"}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Cliente: {client.fantasy}</p>
           <p className="text-2xl font-bold mt-3 num">{formatBRL(totals.gross)}</p>
-          <p className="text-xs text-muted-foreground">Comissão prevista <strong className="text-success">{formatBRL(totals.commissionValue)}</strong></p>
+          <p className="text-xs text-muted-foreground">
+            Comissão prevista <strong className="text-success">{formatBRL(totals.commissionValue)}</strong>
+          </p>
+
+          <div className="mt-6 w-full max-w-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compartilhar / Exportar</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => exportPDF(exportPayload)} className="flex flex-col items-center gap-1 rounded-xl bg-card p-3 text-xs font-semibold shadow-soft">
+                <FileDown className="h-5 w-5 text-primary" /> PDF
+              </button>
+              <button onClick={() => exportCSV(exportPayload)} className="flex flex-col items-center gap-1 rounded-xl bg-card p-3 text-xs font-semibold shadow-soft">
+                <Download className="h-5 w-5 text-primary" /> CSV
+              </button>
+              <button onClick={() => shareWhatsApp(exportPayload)} className="flex flex-col items-center gap-1 rounded-xl bg-success p-3 text-xs font-semibold text-success-foreground shadow-soft">
+                <MessageCircle className="h-5 w-5" /> WhatsApp
+              </button>
+            </div>
+          </div>
+
           <div className="mt-8 flex gap-2">
             <Link to="/" className="rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-soft">Início</Link>
+            {isQuote && (
+              <Link to="/orcamentos" className="rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-soft">Ver orçamentos</Link>
+            )}
             <button
-              onClick={() => { setConfirmed(false); setItems([]); setClientId(null); setPickerOpen(true); }}
+              onClick={() => {
+                setStep("edit"); setItems([]); setClientId(null); setPickerOpen(true);
+                setSignature(undefined); setSignedBy("");
+              }}
               className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow"
             >
               Novo pedido
@@ -131,16 +218,162 @@ const NovoPedido = () => {
     );
   }
 
+  // ============ TELA DE REVISÃO ============
+  if (step === "review" && client && exportPayload) {
+    return (
+      <MobileShell hideTopBar>
+        <div className="-mx-4 gradient-hero px-4 pb-4 pt-5 text-primary-foreground">
+          <button onClick={() => setStep("edit")} className="inline-flex items-center gap-1.5 text-sm opacity-90">
+            <ArrowLeft className="h-4 w-4" /> Voltar a editar
+          </button>
+          <h1 className="mt-2 text-xl font-bold inline-flex items-center gap-2">
+            <Eye className="h-5 w-5" /> Revisar {isQuote ? "orçamento" : "pedido"}
+          </h1>
+          <p className="text-xs opacity-80">Confira tudo antes de enviar.</p>
+        </div>
+
+        {/* Resumo do cliente */}
+        <section className="mt-4 rounded-2xl bg-card p-3 shadow-soft">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold flex-1 truncate">{client.fantasy}</p>
+            <ClientStatusBadge status={client.status} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">{client.city} · {client.segment}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+            <Info label="Tipo" value={isQuote ? "Orçamento" : orderType === "entrega" ? "Entrega" : "Retirada"} />
+            <Info label="Pagto" value={paymentTerm} />
+            {orderType === "entrega" && <Info label="Turno" value={shift === "manha" ? "Manhã" : shift === "tarde" ? "Tarde" : "Noite"} />}
+            {isQuote && <Info label="Validade" value={new Date(validUntil).toLocaleDateString("pt-BR")} />}
+          </div>
+        </section>
+
+        {/* Alertas */}
+        {alerts.length > 0 && (
+          <section className="mt-4 space-y-1.5">
+            {alerts.map((a, i) => {
+              const tone =
+                a.sev === "danger" ? "bg-danger-soft text-danger" :
+                a.sev === "warning" ? "bg-warning-soft text-warning" :
+                "bg-accent/10 text-accent";
+              const Icon = a.sev === "danger" ? ShieldAlert : AlertTriangle;
+              return (
+                <div key={i} className={cn("flex items-start gap-2 rounded-xl p-2.5 text-xs", tone)}>
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="font-medium">{a.msg}</span>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {/* Itens */}
+        <section className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold">Itens ({items.length})</h2>
+          <div className="rounded-2xl bg-card shadow-soft overflow-hidden">
+            {items.map((it, idx) => {
+              const p = productMap[it.productId];
+              const m = itemMarginPct(it.price, p.cost);
+              return (
+                <div key={it.productId} className={cn("flex items-center justify-between gap-2 p-3", idx > 0 && "border-t border-border")}>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {it.qty}x {formatBRL(it.price)} · margem {formatPct(m)}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold num">{formatBRL(it.price * it.qty)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Totais */}
+        <section className="mt-4 rounded-2xl bg-card p-4 shadow-soft">
+          <Row label="Subtotal" value={formatBRL(totals.gross)} />
+          <Row label="Itens" value={`${totals.itemsCount} un.`} />
+          <Row label="Margem" value={formatPct(totals.marginPct)} valueClass={
+            totals.marginPct < 0 ? "text-danger" : totals.marginPct < 5 ? "text-warning" : "text-success"
+          } />
+          <Row label={`Comissão (${formatPct(totals.commissionPct)})`} value={formatBRL(totals.commissionValue)} valueClass="text-success" />
+          <div className="mt-2 border-t border-border pt-2 flex items-center justify-between">
+            <span className="text-sm font-semibold">Total</span>
+            <span className="text-lg font-bold num">{formatBRL(totals.gross)}</span>
+          </div>
+        </section>
+
+        {/* Assinatura na entrega */}
+        {requiresSignature && (
+          <section className="mt-4 rounded-2xl bg-card p-3 shadow-soft">
+            <h3 className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold">
+              <PenLine className="h-4 w-4 text-primary" /> Assinatura do cliente (recebimento)
+            </h3>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              O cliente deve assinar abaixo confirmando o recebimento do pedido.
+            </p>
+            <SignaturePad value={signature} onChange={setSignature} />
+            <input
+              type="text"
+              value={signedBy}
+              onChange={(e) => setSignedBy(e.target.value)}
+              placeholder="Nome de quem recebeu"
+              className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+            />
+            {!signature && (
+              <p className="mt-2 text-[11px] text-warning inline-flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Captura opcional, mas recomendada para comprovação.
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* Exports rápidos antes de enviar */}
+        <section className="mt-4 rounded-2xl bg-card p-3 shadow-soft">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exportar agora</p>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => exportPDF(exportPayload)} className="flex items-center justify-center gap-1.5 rounded-xl bg-muted/60 p-2.5 text-xs font-semibold">
+              <FileDown className="h-4 w-4" /> PDF
+            </button>
+            <button onClick={() => exportCSV(exportPayload)} className="flex items-center justify-center gap-1.5 rounded-xl bg-muted/60 p-2.5 text-xs font-semibold">
+              <Download className="h-4 w-4" /> CSV
+            </button>
+            <button onClick={() => shareWhatsApp(exportPayload)} className="flex items-center justify-center gap-1.5 rounded-xl bg-success p-2.5 text-xs font-semibold text-success-foreground">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </button>
+          </div>
+        </section>
+
+        {/* Sticky CTA */}
+        <div className="fixed inset-x-0 bottom-[68px] z-30 border-t border-border bg-card/95 backdrop-blur">
+          <div className="mx-auto max-w-2xl px-4 py-3 flex items-center gap-2">
+            <button
+              onClick={() => setStep("edit")}
+              className="rounded-xl bg-muted/60 px-4 py-3 text-sm font-semibold"
+            >
+              Corrigir
+            </button>
+            <button
+              disabled={!canSubmit}
+              onClick={confirmSubmit}
+              className="flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              {isQuote ? "Salvar orçamento" : "Confirmar pedido"} <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </MobileShell>
+    );
+  }
+
+  // ============ TELA DE EDIÇÃO ============
   return (
     <MobileShell hideTopBar>
-      {/* Header */}
       <div className="-mx-4 gradient-hero px-4 pb-4 pt-5 text-primary-foreground">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm opacity-90">
+        <button onClick={() => navigate("/")} className="inline-flex items-center gap-1.5 text-sm opacity-90">
           <ArrowLeft className="h-4 w-4" /> Início
-        </Link>
-        <h1 className="mt-2 text-xl font-bold">Novo pedido</h1>
+        </button>
+        <h1 className="mt-2 text-xl font-bold">{isQuote ? "Novo orçamento" : "Novo pedido"}</h1>
 
-        {/* Client selector */}
         <button
           onClick={() => setPickerOpen(true)}
           className="mt-3 flex w-full items-center justify-between rounded-2xl bg-white/15 p-3 text-left backdrop-blur transition active:scale-[0.99]"
@@ -164,7 +397,6 @@ const NovoPedido = () => {
         <div className="mt-10 text-center text-sm text-muted-foreground">Selecione um cliente para iniciar.</div>
       ) : (
         <>
-          {/* Quick actions */}
           <div className="mt-4 grid grid-cols-3 gap-2">
             <button onClick={repeatLastOrder} className="flex flex-col items-center gap-1 rounded-xl bg-card p-3 text-xs font-semibold shadow-soft">
               <Repeat className="h-4 w-4 text-primary" /> Repetir último
@@ -177,7 +409,6 @@ const NovoPedido = () => {
             </button>
           </div>
 
-          {/* Alerts inline */}
           {alerts.length > 0 && (
             <div className="mt-4 space-y-1.5">
               {alerts.map((a, i) => {
@@ -280,7 +511,6 @@ const NovoPedido = () => {
             </div>
           </section>
 
-          {/* Smart suggestions */}
           {suggestions.length > 0 && (
             <section className="mt-5 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-primary/5 p-3">
               <div className="mb-2 flex items-center gap-2">
@@ -313,7 +543,6 @@ const NovoPedido = () => {
             </section>
           )}
 
-          {/* Logistics & Payment */}
           <section className="mt-5 space-y-3">
             <div className="rounded-2xl bg-card p-3 shadow-soft">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de pedido</p>
@@ -332,6 +561,24 @@ const NovoPedido = () => {
                 ))}
               </div>
             </div>
+
+            {isQuote && (
+              <div className="rounded-2xl bg-card p-3 shadow-soft">
+                <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <CalendarClock className="h-3.5 w-3.5" /> Validade do orçamento
+                </p>
+                <input
+                  type="date"
+                  value={validUntil}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                />
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  Status inicial: <strong className="text-foreground">Enviado</strong>. O orçamento não bloqueia faturamento.
+                </p>
+              </div>
+            )}
 
             {orderType === "entrega" && (
               <div className="rounded-2xl bg-card p-3 shadow-soft">
@@ -391,7 +638,7 @@ const NovoPedido = () => {
         </>
       )}
 
-      {/* Sticky totals bar */}
+      {/* Sticky bar */}
       {client && items.length > 0 && (
         <div className="fixed inset-x-0 bottom-[68px] z-30 border-t border-border bg-card/95 backdrop-blur">
           <div className="mx-auto max-w-2xl px-4 py-3">
@@ -401,29 +648,27 @@ const NovoPedido = () => {
                 <p className="text-lg font-bold num">{formatBRL(totals.gross)}</p>
                 <div className="flex items-center gap-2 text-[11px]">
                   <HealthPill level={marginHealth(totals.marginPct)} label={`${formatPct(totals.marginPct)}`} />
-                  <span className="text-muted-foreground">Comissão <strong className="text-success num">{formatBRL(totals.commissionValue)}</strong> ({formatPct(totals.commissionPct)})</span>
+                  <span className="text-muted-foreground">Comissão <strong className="text-success num">{formatBRL(totals.commissionValue)}</strong></span>
                 </div>
               </div>
               <button
-                disabled={totals.blocked || client.status === "bloqueado"}
-                onClick={() => setConfirmed(true)}
-                className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50"
+                disabled={!canSubmit}
+                onClick={() => setStep("review")}
+                className="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-50 inline-flex items-center gap-2"
               >
-                Enviar pedido
+                Revisar <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Client picker bottom sheet */}
       {pickerOpen && (
         <BottomSheet onClose={() => setPickerOpen(false)} title="Selecionar cliente">
           <ClientPicker onPick={(id) => { setClientId(id); setItems([]); setPickerOpen(false); }} />
         </BottomSheet>
       )}
 
-      {/* Product picker bottom sheet */}
       {productPickerOpen && (
         <BottomSheet onClose={() => setProductPickerOpen(false)} title="Adicionar produto">
           <ProductPicker
@@ -435,6 +680,24 @@ const NovoPedido = () => {
     </MobileShell>
   );
 };
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-muted/60 p-1.5 text-center">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="font-semibold truncate">{value}</p>
+    </div>
+  );
+}
+
+function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn("font-semibold num", valueClass)}>{value}</span>
+    </div>
+  );
+}
 
 function BottomSheet({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
   useEffect(() => {

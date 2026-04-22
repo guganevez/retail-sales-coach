@@ -218,11 +218,11 @@ const Pedidos = () => {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
-                      <Highlight text={c.fantasy} term={q} />
+                      <MarkText text={c.fantasy} term={q} />
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       <MapPin className="mr-0.5 inline h-3 w-3" />
-                      <Highlight text={c.city} term={q} /> · {c.orders.length} pedido(s)
+                      <MarkText text={c.city} term={q} /> · {c.orders.length} pedido(s)
                       {s.matchField === "city" && <span className="ml-1 text-[9px] uppercase opacity-70">via cidade</span>}
                     </p>
                   </div>

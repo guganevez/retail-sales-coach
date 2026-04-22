@@ -496,6 +496,30 @@ const NovoPedido = () => {
             </button>
           </div>
 
+          {/* Painel de histórico do cliente (expansível) */}
+          <ClientHistoryPanel
+            client={client}
+            orders={recentOrders}
+            prices={prices}
+            productMap={productMap}
+            inOrder={new Set(items.map(i => i.productId))}
+            onAddProduct={(pid, atPrice) => addProduct(pid, atPrice)}
+          />
+
+          {/* Painel de bloqueios detalhados — com correção automática */}
+          <BlockingPanel
+            client={client}
+            items={items}
+            productMap={productMap}
+            totals={totals}
+            capacityRemaining={capacityRemaining}
+            capacityWarning={capacityWarning}
+            orderType={orderType}
+            onFixItemPrice={fixItemPrice}
+            onSuggestSubstitute={suggestSubstitute}
+            onRemoveItem={removeItem}
+          />
+
           {alerts.length > 0 && (
             <div className="mt-4 space-y-1.5">
               {alerts.map((a, i) => {

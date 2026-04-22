@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, ReactNode } from "react";
-import { manager, supervisors, reps, SalesRep, SupervisorNode } from "./team";
+import { manager, supervisors, reps, SalesRep, SupervisorNode, getRep, getSupervisor } from "./team";
 
 export type Role = "vendedor" | "supervisor" | "gerente";
 
@@ -16,7 +16,12 @@ interface ProfileCtx {
   profile: Profile;
   role: Role;
   setRole: (r: Role) => void;
-  /** quando supervisor: id do vendedor selecionado (ou null = equipe inteira) */
+  /** identidade ativa dentro do papel (qual vendedor "eu sou", qual supervisor "eu sou") */
+  activeRepId: string;
+  setActiveRepId: (id: string) => void;
+  activeSupervisorId: string;
+  setActiveSupervisorId: (id: string) => void;
+  /** quando supervisor: id do vendedor selecionado para drill (ou null = equipe inteira) */
   selectedRepId: string | null;
   setSelectedRepId: (id: string | null) => void;
   /** quando gerente: id do supervisor selecionado (ou null = visão consolidada) */
@@ -29,21 +34,22 @@ interface ProfileCtx {
 
 const Ctx = createContext<ProfileCtx | null>(null);
 
-// "Eu" em cada papel — Rafael (v1) é o vendedor demo, Patrícia (s1) o supervisor demo, Eduardo o gerente.
-const DEFAULT_REP: SalesRep = reps.find(r => r.id === "v1")!;
-const DEFAULT_SUP: SupervisorNode = supervisors.find(s => s.id === "s1")!;
+const DEFAULT_REP_ID = "v1";
+const DEFAULT_SUP_ID = "s1";
 
-function buildProfile(role: Role): Profile {
+function buildProfile(role: Role, repId: string, supId: string): Profile {
   if (role === "vendedor") {
+    const rep = getRep(repId) ?? reps[0];
     return {
-      role, id: DEFAULT_REP.id, name: DEFAULT_REP.name, initials: DEFAULT_REP.initials,
-      supervisorId: DEFAULT_REP.supervisorId,
+      role, id: rep.id, name: rep.name, initials: rep.initials,
+      supervisorId: rep.supervisorId,
     };
   }
   if (role === "supervisor") {
+    const sup = getSupervisor(supId) ?? supervisors[0];
     return {
-      role, id: DEFAULT_SUP.id, name: DEFAULT_SUP.name, initials: DEFAULT_SUP.initials,
-      team: DEFAULT_SUP.team,
+      role, id: sup.id, name: sup.name, initials: sup.initials,
+      team: sup.team,
     };
   }
   return {
@@ -55,11 +61,13 @@ function buildProfile(role: Role): Profile {
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>("vendedor");
   const [scope, setScope] = useState<"individual" | "equipe">("equipe");
+  const [activeRepId, setActiveRepId] = useState<string>(DEFAULT_REP_ID);
+  const [activeSupervisorId, setActiveSupervisorId] = useState<string>(DEFAULT_SUP_ID);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string | null>(null);
 
   const value = useMemo<ProfileCtx>(() => ({
-    profile: buildProfile(role),
+    profile: buildProfile(role, activeRepId, activeSupervisorId),
     role,
     setRole: (r) => {
       setRole(r);
@@ -67,10 +75,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSelectedSupervisorId(null);
       setScope(r === "vendedor" ? "individual" : "equipe");
     },
+    activeRepId,
+    setActiveRepId: (id) => {
+      setActiveRepId(id);
+      // ao trocar a identidade do vendedor, re-sincroniza o supervisor "pai"
+      const r = getRep(id);
+      if (r) setActiveSupervisorId(r.supervisorId);
+    },
+    activeSupervisorId,
+    setActiveSupervisorId,
     selectedRepId, setSelectedRepId,
     selectedSupervisorId, setSelectedSupervisorId,
     scope, setScope,
-  }), [role, scope, selectedRepId, selectedSupervisorId]);
+  }), [role, scope, activeRepId, activeSupervisorId, selectedRepId, selectedSupervisorId]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

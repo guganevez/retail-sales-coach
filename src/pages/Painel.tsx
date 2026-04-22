@@ -13,6 +13,7 @@ import {
 const Painel = () => {
   const {
     role, scope, setScope,
+    profile,
     selectedRepId, setSelectedRepId,
     selectedSupervisorId, setSelectedSupervisorId,
   } = useProfile();
@@ -20,28 +21,23 @@ const Painel = () => {
   // Defaults para drill-down
   const [localRepId, setLocalRepId] = useState<string | null>(selectedRepId);
 
-  // ================== Dados conforme papel ==================
-  // Vendedor: vê só os próprios KPIs
-  // Supervisor: vê total da sua equipe + ranking dos seus 3 vendedores; pode drill em 1 vendedor
-  // Gerente: vê total geral + comparativo dos 2 supervisores; pode drill em 1 supervisor
-
   let kpis = { sold: 0, goal: 0, deals: 0, margin: 0, ticket: 0, commission: 0, goalPct: 0 };
   let label = "";
   let viewSupervisor: typeof supervisors[number] | null = null;
 
   if (role === "vendedor") {
-    kpis = kpisForRep("v1");
-    label = reps.find(r => r.id === "v1")!.name;
+    kpis = kpisForRep(profile.id);
+    label = reps.find(r => r.id === profile.id)?.name ?? profile.name;
   } else if (role === "supervisor") {
-    const supId = "s1"; // perfil demo
+    const supId = profile.id;
     if (scope === "individual" && localRepId) {
       kpis = kpisForRep(localRepId);
       label = reps.find(r => r.id === localRepId)!.name;
     } else {
       kpis = kpisForSupervisor(supId);
-      label = supervisors.find(s => s.id === supId)!.team;
+      label = supervisors.find(s => s.id === supId)?.team ?? "";
     }
-    viewSupervisor = supervisors.find(s => s.id === supId)!;
+    viewSupervisor = supervisors.find(s => s.id === supId) ?? null;
   } else {
     // gerente
     if (selectedRepId) {

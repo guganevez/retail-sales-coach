@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { OrderTracking } from "@/components/OrderTracking";
 import { useProfile } from "@/lib/profile";
@@ -9,7 +9,7 @@ import {
 } from "@/lib/tracking";
 import { reps, supervisors } from "@/lib/team";
 import { cn } from "@/lib/utils";
-import { Radio, Search, X, MapPin, Truck } from "lucide-react";
+import { Radio, Search, X, MapPin, Truck, CornerDownLeft, ArrowDown, ArrowUp } from "lucide-react";
 
 const STATUS_FILTERS: { id: TrackingStatus | "todos" | "live"; label: string }[] = [
   { id: "live", label: "Ao vivo" },

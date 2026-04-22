@@ -44,7 +44,12 @@ const Painel = () => {
     viewSupervisor = supervisors.find(s => s.id === supId)!;
   } else {
     // gerente
-    if (selectedSupervisorId) {
+    if (selectedRepId) {
+      kpis = kpisForRep(selectedRepId);
+      const r = reps.find(x => x.id === selectedRepId)!;
+      label = `${r.name} · ${r.region}`;
+      viewSupervisor = supervisors.find(s => s.id === r.supervisorId)!;
+    } else if (selectedSupervisorId) {
       kpis = kpisForSupervisor(selectedSupervisorId);
       const sup = supervisors.find(s => s.id === selectedSupervisorId)!;
       label = sup.team;

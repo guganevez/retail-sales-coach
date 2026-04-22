@@ -62,9 +62,11 @@ const Painel = () => {
 
   // Ranking geral (sempre disponível p/ supervisor e gerente)
   const ranking = role === "gerente"
-    ? (selectedSupervisorId
-        ? viewSupervisor!.reps
-        : [...reps].sort((a, b) => b.sold - a.sold))
+    ? (selectedRepId
+        ? [reps.find(r => r.id === selectedRepId)!]
+        : selectedSupervisorId
+          ? viewSupervisor!.reps
+          : [...reps].sort((a, b) => b.sold - a.sold))
     : role === "supervisor"
       ? viewSupervisor!.reps
       : [];

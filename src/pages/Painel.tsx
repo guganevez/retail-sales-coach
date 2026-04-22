@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { DailyGoalCard } from "@/components/DailyGoalCard";
 import { clients, formatBRL, formatPct, salesperson } from "@/lib/mock";
 import { Trophy, Users, TrendingDown, UserCircle2, UsersRound, Building2 } from "lucide-react";
 import { useProfile, ROLE_LABEL } from "@/lib/profile";
+import { useHolidays } from "@/lib/holidays";
 import { cn } from "@/lib/utils";
 import {
   reps, supervisors, manager,
@@ -18,6 +19,8 @@ const Painel = () => {
     selectedRepId, setSelectedRepId,
     selectedSupervisorId, setSelectedSupervisorId,
   } = useProfile();
+  const { holidays } = useHolidays();
+  const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
 
   // Defaults para drill-down
   const [localRepId, setLocalRepId] = useState<string | null>(selectedRepId);
@@ -232,6 +235,7 @@ const Painel = () => {
           monthlyGoal={kpis.goal}
           achievedMonth={kpis.sold}
           achievedToday={role === "vendedor" ? salesperson.achievedToday : Math.round(kpis.sold * 0.05)}
+          holidays={holidaySet}
         />
       </div>
 

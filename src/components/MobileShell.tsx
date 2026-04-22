@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown, Truck, Check } from "lucide-react";
+import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown, Truck, Check, CalendarDays } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 import { smartAlerts } from "@/lib/mock";
@@ -17,10 +17,10 @@ interface Props {
 
 const tabs = [
   { to: "/", label: "Início", icon: Home, end: true },
-  { to: "/pedidos", label: "Rastreio", icon: Truck },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/pedido/novo", label: "Pedido", icon: ShoppingCart, primary: true },
+  { to: "/pedidos", label: "Rastreio", icon: Truck },
   { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/painel", label: "Painel", icon: BarChart3 },
 ];
 
 export function MobileShell({ title, subtitle, children, rightSlot, hideTopBar }: Props) {
@@ -63,6 +63,13 @@ export function MobileShell({ title, subtitle, children, rightSlot, hideTopBar }
                 >
                   <Search className="h-5 w-5" />
                 </button>
+                <Link
+                  to="/painel"
+                  className="grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur transition hover:bg-white/25"
+                  aria-label="Painel"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                </Link>
                 <Link
                   to="/alertas"
                   className="relative grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur transition hover:bg-white/25"

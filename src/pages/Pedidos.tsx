@@ -44,13 +44,33 @@ const Pedidos = () => {
     return Array.from(map.values()).sort((a, b) => a.fantasy.localeCompare(b.fantasy));
   }, [orders]);
 
-  // Match de busca por cliente (nome ou cidade)
+  // Match de busca por cliente (nome ou cidade) — com score p/ ranquear sugestões
   const q = query.trim().toLowerCase();
-  const matchedClients = q
-    ? clientList.filter(c =>
-        c.fantasy.toLowerCase().includes(q) || c.city.toLowerCase().includes(q),
-      )
-    : [];
+  const scored = useMemo(() => {
+    if (!q) return [];
+    return clientList
+      .map(c => {
+        const f = c.fantasy.toLowerCase();
+        const ct = c.city.toLowerCase();
+        let score = 0;
+        let matchField: "fantasy" | "city" | null = null;
+        if (f === q) { score = 100; matchField = "fantasy"; }
+        else if (f.startsWith(q)) { score = 80; matchField = "fantasy"; }
+        else if (f.includes(q)) { score = 50; matchField = "fantasy"; }
+        else if (ct.startsWith(q)) { score = 40; matchField = "city"; }
+        else if (ct.includes(q)) { score = 20; matchField = "city"; }
+        // bônus: clientes com pedidos ao vivo aparecem antes
+        const live = c.orders.some(o => ["separacao","carga","em_rota"].includes(o.status));
+        if (live) score += 5;
+        // desempate: mais pedidos primeiro
+        score += Math.min(4, c.orders.length);
+        return { client: c, score, matchField };
+      })
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }, [q, clientList]);
+  const matchedClients = scored.map(s => s.client);
+  const suggestions = scored.slice(0, 6);
 
   const filtered = useMemo(() => {
     let base = orders;

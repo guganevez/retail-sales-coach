@@ -26,6 +26,22 @@ const Pedidos = () => {
   const { role, profile } = useProfile();
   const [filter, setFilter] = useState<TrackingStatus | "todos" | "live">("live");
   const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Atalho "/" foca a busca (quando não estiver em outro input)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const orders: TrackedOrder[] = useMemo(() => {
     if (role === "vendedor") return ordersForRep(profile.id);

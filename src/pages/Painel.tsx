@@ -202,8 +202,7 @@ const Painel = () => {
               .slice()
               .sort((a, b) => b.sold - a.sold)
               .map((r, i) => {
-                const meId = role === "vendedor" ? "v1" : null;
-                const isMe = r.id === meId;
+                const isMe = false; // demo: o "eu" só aparece como vendedor (visão diferente)
                 const k = kpisForRep(r.id);
                 return (
                   <button

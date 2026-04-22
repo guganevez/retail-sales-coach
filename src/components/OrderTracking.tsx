@@ -136,6 +136,11 @@ export function OrderTracking({ order, compact }: Props) {
           <MapPin className="h-4 w-4 text-primary" /> Localização
         </h3>
 
+        {/* Mini-mapa CD / cliente / veículo */}
+        <div className="mt-3">
+          <TrackingMap order={order} />
+        </div>
+
         <div className="mt-3 space-y-3">
           <Row icon={<Truck className="h-4 w-4" />} label="Origem (CD)">
             <p className="text-xs font-semibold">{COMPANY.name}</p>

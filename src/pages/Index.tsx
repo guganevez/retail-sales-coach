@@ -43,14 +43,43 @@ const Index = () => {
         <StatCard label="Pedidos hoje" value="4" hint="Ticket médio R$ 2.467" />
       </section>
 
+      {/* Continuar rascunho */}
+      {hasDraft && draft && (
+        <Link
+          to="/pedido/novo?retomar=1"
+          className="mt-5 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft p-3 shadow-soft transition active:scale-[0.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning text-warning-foreground">
+            <FileEdit className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-warning">Rascunho em andamento</p>
+            <p className="truncate text-sm font-semibold text-foreground">
+              {draftClient ? draftClient.fantasy : "Sem cliente"} · {draft.items.length} {draft.items.length === 1 ? "item" : "itens"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {draftTotals ? formatBRL(draftTotals.gross) : "R$ 0,00"} · atualizado {timeAgo(draft.updatedAt)}
+            </p>
+          </div>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearDraft(); }}
+            className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-card"
+            aria-label="Descartar rascunho"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <ArrowRight className="h-5 w-5 text-warning" />
+        </Link>
+      )}
+
       {/* Quick CTA */}
       <Link
         to="/pedido/novo"
-        className="mt-5 flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground shadow-glow transition active:scale-[0.99]"
+        className="mt-3 flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground shadow-glow transition active:scale-[0.99]"
       >
         <div>
           <p className="text-xs uppercase tracking-wide opacity-80">Copiloto de vendas</p>
-          <p className="text-base font-semibold">Iniciar novo pedido</p>
+          <p className="text-base font-semibold">{hasDraft ? "Iniciar outro pedido" : "Iniciar novo pedido"}</p>
           <p className="mt-0.5 text-xs opacity-80">Sugestões inteligentes ativadas</p>
         </div>
         <ArrowRight className="h-6 w-6" />

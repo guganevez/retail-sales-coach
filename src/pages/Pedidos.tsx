@@ -364,6 +364,19 @@ const Pedidos = () => {
   );
 };
 
+function MarkText({ text, term }: { text: string; term: string }) {
+  if (!term) return <>{text}</>;
+  const i = text.toLowerCase().indexOf(term.toLowerCase());
+  if (i < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, i)}
+      <mark className="rounded bg-primary/20 px-0.5 text-foreground">{text.slice(i, i + term.length)}</mark>
+      {text.slice(i + term.length)}
+    </>
+  );
+}
+
 function Stat({ label, value, tone, live }: { label: string; value: number; tone?: "success"; live?: boolean }) {
   return (
     <div className="rounded-2xl bg-card p-3 text-center shadow-soft">

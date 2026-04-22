@@ -6,6 +6,8 @@ import {
 } from "@/lib/tracking";
 import { formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { TrackingMap } from "./TrackingMap";
+import { EtaSummary } from "./EtaSummary";
 
 interface Props {
   order: TrackedOrder;

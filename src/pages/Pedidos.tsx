@@ -5,10 +5,11 @@ import { useProfile } from "@/lib/profile";
 import {
   ordersForRep, ordersForSupervisor, ordersForManager,
   TrackedOrder, TrackingStatus, STATUS_LABEL,
+  COMPANY, distanceKm,
 } from "@/lib/tracking";
 import { reps, supervisors } from "@/lib/team";
 import { cn } from "@/lib/utils";
-import { Radio } from "lucide-react";
+import { Radio, Search, X, MapPin, Truck } from "lucide-react";
 
 const STATUS_FILTERS: { id: TrackingStatus | "todos" | "live"; label: string }[] = [
   { id: "live", label: "Ao vivo" },

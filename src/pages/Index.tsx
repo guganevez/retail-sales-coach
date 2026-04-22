@@ -1,13 +1,20 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
-import { clients, formatBRL, formatPct, salesperson, smartAlerts } from "@/lib/mock";
+import { clients, formatBRL, formatPct, products, salesperson, smartAlerts } from "@/lib/mock";
+import { useDraft } from "@/lib/draft";
+import { computeTotals } from "@/lib/calc";
+
+const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
 const Index = () => {
   const goalPct = Math.min(100, (salesperson.achievedMonth / salesperson.goalMonth) * 100);
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
   const topAlerts = smartAlerts.slice(0, 3);
+  const { draft, hasDraft, clearDraft } = useDraft();
+  const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
+  const draftTotals = draft ? computeTotals(draft.items, productMap) : null;
 
   return (
     <MobileShell
@@ -36,14 +43,43 @@ const Index = () => {
         <StatCard label="Pedidos hoje" value="4" hint="Ticket médio R$ 2.467" />
       </section>
 
+      {/* Continuar rascunho */}
+      {hasDraft && draft && (
+        <Link
+          to="/pedido/novo?retomar=1"
+          className="mt-5 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft p-3 shadow-soft transition active:scale-[0.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning text-warning-foreground">
+            <FileEdit className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-warning">Rascunho em andamento</p>
+            <p className="truncate text-sm font-semibold text-foreground">
+              {draftClient ? draftClient.fantasy : "Sem cliente"} · {draft.items.length} {draft.items.length === 1 ? "item" : "itens"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {draftTotals ? formatBRL(draftTotals.gross) : "R$ 0,00"} · atualizado {timeAgo(draft.updatedAt)}
+            </p>
+          </div>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearDraft(); }}
+            className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-card"
+            aria-label="Descartar rascunho"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <ArrowRight className="h-5 w-5 text-warning" />
+        </Link>
+      )}
+
       {/* Quick CTA */}
       <Link
         to="/pedido/novo"
-        className="mt-5 flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground shadow-glow transition active:scale-[0.99]"
+        className="mt-3 flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground shadow-glow transition active:scale-[0.99]"
       >
         <div>
           <p className="text-xs uppercase tracking-wide opacity-80">Copiloto de vendas</p>
-          <p className="text-base font-semibold">Iniciar novo pedido</p>
+          <p className="text-base font-semibold">{hasDraft ? "Iniciar outro pedido" : "Iniciar novo pedido"}</p>
           <p className="mt-0.5 text-xs opacity-80">Sugestões inteligentes ativadas</p>
         </div>
         <ArrowRight className="h-6 w-6" />
@@ -126,5 +162,15 @@ const Index = () => {
     </MobileShell>
   );
 };
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "agora";
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
 
 export default Index;

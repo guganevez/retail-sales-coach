@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Search, X, Plus, Minus, Sparkles, Truck, Package, FileText,
   AlertTriangle, ShieldAlert, CheckCircle2, Repeat, ChevronRight, Tag,
-  CalendarClock, Download, FileDown, MessageCircle, PenLine, ArrowRight, Eye,
+  CalendarClock, Download, FileDown, MessageCircle, PenLine, ArrowRight, Eye, Save,
 } from "lucide-react";
+import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
 import { ClientStatusBadge } from "@/components/ClientStatusBadge";
 import { HealthPill, HealthDot } from "@/components/HealthDot";
 import { SignaturePad } from "@/components/SignaturePad";
+import { BlockingPanel } from "@/components/BlockingPanel";
+import { ClientHistoryPanel } from "@/components/ClientHistoryPanel";
 import {
   clients, formatBRL, formatPct, frequentByClient, lastPriceMap,
   logistics, products, recentOrders,
@@ -18,6 +21,7 @@ import { computeTotals, marginHealth, priceHealth, itemMarginPct } from "@/lib/c
 import { cn } from "@/lib/utils";
 import { useQuotes } from "@/lib/quotes";
 import { useProfile } from "@/lib/profile";
+import { useDraft } from "@/lib/draft";
 import { exportCSV, exportPDF, shareWhatsApp } from "@/lib/exports";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
@@ -29,26 +33,30 @@ const NovoPedido = () => {
   const navigate = useNavigate();
   const { addQuote } = useQuotes();
   const { profile } = useProfile();
+  const { draft, saveDraft, clearDraft } = useDraft();
 
   const preselected = params.get("cliente");
   const initialType = (params.get("tipo") as OrderType) || "entrega";
   const preselectedProduct = params.get("produto");
+  const resume = params.get("retomar") === "1" && !!draft;
 
-  const [clientId, setClientId] = useState<string | null>(preselected);
-  const [pickerOpen, setPickerOpen] = useState(!preselected);
+  const [clientId, setClientId] = useState<string | null>(resume ? draft!.clientId : preselected);
+  const [pickerOpen, setPickerOpen] = useState(resume ? !draft!.clientId : !preselected);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>(initialType);
-  const [shift, setShift] = useState<Shift>("manha");
-  const [paymentTerm, setPaymentTerm] = useState("28 dias");
+  const [items, setItems] = useState<OrderItem[]>(resume ? draft!.items : []);
+  const [orderType, setOrderType] = useState<OrderType>(resume ? draft!.orderType : initialType);
+  const [shift, setShift] = useState<Shift>(resume ? draft!.shift : "manha");
+  const [paymentTerm, setPaymentTerm] = useState(resume ? draft!.paymentTerm : "28 dias");
   const [step, setStep] = useState<Step>("edit");
-  const [signature, setSignature] = useState<string | undefined>();
-  const [signedBy, setSignedBy] = useState("");
+  const [signature, setSignature] = useState<string | undefined>(resume ? draft!.signature : undefined);
+  const [signedBy, setSignedBy] = useState(resume ? draft!.signedBy : "");
   const [validUntil, setValidUntil] = useState(() => {
+    if (resume && draft!.validUntil) return draft!.validUntil;
     const d = new Date();
     d.setDate(d.getDate() + 15);
     return d.toISOString().slice(0, 10);
   });
+  const [showSignatureError, setShowSignatureError] = useState(false);
 
   const client = clients.find(c => c.id === clientId) || null;
   const prices = client ? (lastPriceMap[client.id] || {}) : {};
@@ -58,7 +66,7 @@ const NovoPedido = () => {
   const capacityRemaining = logistics.capacityKg - logistics.scheduledKg;
   const capacityWarning = totals.weightKg > capacityRemaining;
 
-  function addProduct(productId: string) {
+  function addProduct(productId: string, atPrice?: number) {
     setItems(prev => {
       const existing = prev.find(i => i.productId === productId);
       const p = productMap[productId];
@@ -68,10 +76,32 @@ const NovoPedido = () => {
       return [...prev, {
         productId,
         qty: 1,
-        price: prices[productId] || p.psv,
+        price: atPrice ?? prices[productId] ?? p.psv,
         lastPrice: prices[productId],
       }];
     });
+  }
+
+  // Auto-correção de preço pelo painel de bloqueios
+  function fixItemPrice(productId: string, newPrice: number) {
+    setItems(prev => prev.map(i => i.productId === productId ? { ...i, price: newPrice } : i));
+    const p = productMap[productId];
+    toast.success(`Preço de ${p?.name ?? "item"} ajustado para ${formatBRL(newPrice)}`);
+  }
+
+  // Sugere o melhor substituto de maior margem na mesma categoria
+  function suggestSubstitute(productId: string) {
+    const p = productMap[productId];
+    if (!p) return;
+    const candidate = products
+      .filter(x => x.id !== productId && x.category === p.category)
+      .sort((a, b) => itemMarginPct(b.psv, b.cost) - itemMarginPct(a.psv, a.cost))[0];
+    if (!candidate) {
+      toast.info("Sem substituto disponível na mesma categoria.");
+      return;
+    }
+    addProduct(candidate.id);
+    toast.success(`Substituto sugerido: ${candidate.name}`);
   }
 
   // Auto-add se veio um produto da busca universal
@@ -149,6 +179,25 @@ const NovoPedido = () => {
 
   function confirmSubmit() {
     if (!client || !exportPayload) return;
+
+    // Validação BLOQUEANTE: assinatura + recebedor obrigatórios para entregas
+    if (requiresSignature) {
+      const missingSig = !signature;
+      const missingName = signedBy.trim().length < 2;
+      if (missingSig || missingName) {
+        setShowSignatureError(true);
+        const what = missingSig && missingName
+          ? "assinatura e nome do recebedor"
+          : missingSig ? "assinatura do recebedor" : "nome do recebedor";
+        toast.error(`Não é possível confirmar: faltando ${what}.`);
+        // Rola até a seção de assinatura
+        setTimeout(() => {
+          document.getElementById("signature-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
+        return;
+      }
+    }
+
     // Sempre persiste para a lista de "orçamentos/pedidos"
     addQuote({
       clientId: client.id,
@@ -165,8 +214,25 @@ const NovoPedido = () => {
       signedBy: signedBy || undefined,
       isOrder: !isQuote,
     });
+    clearDraft();
     setStep("confirmed");
   }
+
+  // ============ AUTO-SAVE EM MEMÓRIA ============
+  const firstSaveSkip = useRef(true);
+  useEffect(() => {
+    // Não salva enquanto está mostrando confirmação
+    if (step === "confirmed") return;
+    // Pula a primeira passagem (carregamento) para evitar sobrescrever ao retomar
+    if (firstSaveSkip.current) {
+      firstSaveSkip.current = false;
+      return;
+    }
+    saveDraft({
+      clientId, items, orderType, shift, paymentTerm, validUntil, signedBy, signature,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, items, orderType, shift, paymentTerm, validUntil, signedBy, signature, step]);
 
   // ============ TELA DE CONFIRMAÇÃO ============
   if (step === "confirmed" && client && exportPayload) {
@@ -205,8 +271,9 @@ const NovoPedido = () => {
             )}
             <button
               onClick={() => {
+                clearDraft();
                 setStep("edit"); setItems([]); setClientId(null); setPickerOpen(true);
-                setSignature(undefined); setSignedBy("");
+                setSignature(undefined); setSignedBy(""); setShowSignatureError(false);
               }}
               className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow"
             >
@@ -302,27 +369,47 @@ const NovoPedido = () => {
           </div>
         </section>
 
-        {/* Assinatura na entrega */}
+        {/* Assinatura na entrega — OBRIGATÓRIA */}
         {requiresSignature && (
-          <section className="mt-4 rounded-2xl bg-card p-3 shadow-soft">
-            <h3 className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold">
-              <PenLine className="h-4 w-4 text-primary" /> Assinatura do cliente (recebimento)
+          <section
+            id="signature-section"
+            className={cn(
+              "mt-4 rounded-2xl p-3 shadow-soft transition",
+              showSignatureError && (!signature || signedBy.trim().length < 2)
+                ? "bg-danger-soft border-2 border-danger"
+                : "bg-card border-2 border-transparent"
+            )}
+          >
+            <h3 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold">
+              <PenLine className="h-4 w-4 text-primary" /> Assinatura do recebedor
+              <span className="ml-1 rounded-md bg-danger px-1.5 py-0.5 text-[10px] font-bold text-danger-foreground">
+                OBRIGATÓRIO
+              </span>
             </h3>
             <p className="mb-2 text-[11px] text-muted-foreground">
-              O cliente deve assinar abaixo confirmando o recebimento do pedido.
+              Para entregas é necessário capturar a assinatura e o nome de quem recebeu o pedido.
             </p>
             <SignaturePad value={signature} onChange={setSignature} />
             <input
               type="text"
               value={signedBy}
               onChange={(e) => setSignedBy(e.target.value)}
-              placeholder="Nome de quem recebeu"
-              className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              placeholder="Nome de quem recebeu *"
+              className={cn(
+                "mt-2 h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary",
+                showSignatureError && signedBy.trim().length < 2 ? "border-danger" : "border-border"
+              )}
             />
-            {!signature && (
-              <p className="mt-2 text-[11px] text-warning inline-flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Captura opcional, mas recomendada para comprovação.
-              </p>
+            {showSignatureError && (!signature || signedBy.trim().length < 2) && (
+              <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-danger px-2.5 py-2 text-[11px] font-semibold text-danger-foreground">
+                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Não é possível confirmar o pedido sem
+                  {!signature && " assinatura"}
+                  {!signature && signedBy.trim().length < 2 && " e"}
+                  {signedBy.trim().length < 2 && " nome do recebedor"}.
+                </span>
+              </div>
             )}
           </section>
         )}
@@ -408,6 +495,30 @@ const NovoPedido = () => {
               <Plus className="h-4 w-4" /> Produto
             </button>
           </div>
+
+          {/* Painel de histórico do cliente (expansível) */}
+          <ClientHistoryPanel
+            client={client}
+            orders={recentOrders}
+            prices={prices}
+            productMap={productMap}
+            inOrder={new Set(items.map(i => i.productId))}
+            onAddProduct={(pid, atPrice) => addProduct(pid, atPrice)}
+          />
+
+          {/* Painel de bloqueios detalhados — com correção automática */}
+          <BlockingPanel
+            client={client}
+            items={items}
+            productMap={productMap}
+            totals={totals}
+            capacityRemaining={capacityRemaining}
+            capacityWarning={capacityWarning}
+            orderType={orderType}
+            onFixItemPrice={fixItemPrice}
+            onSuggestSubstitute={suggestSubstitute}
+            onRemoveItem={removeItem}
+          />
 
           {alerts.length > 0 && (
             <div className="mt-4 space-y-1.5">

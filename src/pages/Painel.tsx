@@ -19,6 +19,8 @@ const Painel = () => {
     selectedRepId, setSelectedRepId,
     selectedSupervisorId, setSelectedSupervisorId,
   } = useProfile();
+  const { holidays } = useHolidays();
+  const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
 
   // Defaults para drill-down
   const [localRepId, setLocalRepId] = useState<string | null>(selectedRepId);

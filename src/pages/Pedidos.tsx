@@ -93,7 +93,82 @@ const Pedidos = () => {
         <Stat label="Entregues" value={orders.filter(o => o.status === "entregue").length} tone="success" />
       </div>
 
-      {/* Filtros */}
+      {/* Busca por cliente — atalho rápido */}
+      <div className="mb-3 flex items-center gap-2 rounded-2xl bg-card px-3 py-2 shadow-soft">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar cliente, fantasia ou cidade…"
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+        {query && (
+          <button onClick={() => setQuery("")} aria-label="Limpar busca">
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+
+      {/* Resultados de cliente — agrupa pedidos do cliente buscado */}
+      {q && matchedClients.length > 0 && (
+        <section className="mb-4 space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            {matchedClients.length} cliente(s) encontrado(s)
+          </p>
+          {matchedClients.map(c => {
+            const live = c.orders.find(o => ["separacao","carga","em_rota"].includes(o.status));
+            const liveVehicle = live?.delivery.vehicle;
+            const liveDist = live ? distanceKm(COMPANY.geo, live.delivery.geo) : 0;
+            return (
+              <div key={c.id} className="rounded-2xl bg-card p-3 shadow-soft">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{c.fantasy}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      <MapPin className="mr-0.5 inline h-3 w-3" />
+                      {c.city} · {c.orders.length} pedido(s)
+                    </p>
+                  </div>
+                  {live && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      <Radio className="h-3 w-3 animate-pulse-soft" /> AO VIVO
+                    </span>
+                  )}
+                </div>
+
+                {/* Posição atual do veículo do pedido em andamento */}
+                {live && liveVehicle && liveVehicle.plate !== "—" && (
+                  <div className="mb-2 rounded-xl bg-primary/5 p-2 text-[11px]">
+                    <p className="inline-flex items-center gap-1 font-bold text-primary">
+                      <Truck className="h-3 w-3" /> {liveVehicle.plate} · {liveVehicle.driver}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground num">
+                      Posição: {liveVehicle.geo.lat.toFixed(4)}, {liveVehicle.geo.lng.toFixed(4)} ·
+                      {" "}{distanceKm(liveVehicle.geo, live.delivery.geo).toFixed(1)} km do destino
+                      {" "}({liveDist.toFixed(1)} km do CD)
+                    </p>
+                  </div>
+                )}
+
+                {/* Lista compacta dos pedidos do cliente */}
+                <div className="space-y-2">
+                  {c.orders
+                    .slice()
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map(o => <OrderTracking key={o.id} order={o} compact />)}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {q && matchedClients.length === 0 && (
+        <div className="mb-3 rounded-2xl bg-card p-4 text-center shadow-soft">
+          <p className="text-sm text-muted-foreground">Nenhum cliente encontrado para “{query}”.</p>
+        </div>
+      )}
+
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {STATUS_FILTERS.map(f => (
           <button

@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X, Truck, Radio } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { clients, formatBRL, formatPct, products, salesperson, smartAlerts } from "@/lib/mock";
 import { useDraft } from "@/lib/draft";
 import { computeTotals } from "@/lib/calc";
+import { useProfile } from "@/lib/profile";
+import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/tracking";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
@@ -13,8 +15,17 @@ const Index = () => {
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
   const topAlerts = smartAlerts.slice(0, 3);
   const { draft, hasDraft, clearDraft } = useDraft();
+  const { role, profile } = useProfile();
   const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
   const draftTotals = draft ? computeTotals(draft.items, productMap) : null;
+
+  // Pedidos em rastreio (filtrados por papel)
+  const allTracked = role === "vendedor"
+    ? ordersForRep(profile.id)
+    : role === "supervisor"
+      ? ordersForSupervisor(profile.id)
+      : ordersForManager();
+  const liveOrders = allTracked.filter(o => ["separacao","carga","em_rota"].includes(o.status));
 
   return (
     <MobileShell
@@ -84,6 +95,30 @@ const Index = () => {
         </div>
         <ArrowRight className="h-6 w-6" />
       </Link>
+
+      {/* Pedidos em rastreio ao vivo */}
+      {liveOrders.length > 0 && (
+        <Link
+          to="/pedidos"
+          className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft transition active:scale-[0.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Truck className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+              <Radio className="h-3 w-3 animate-pulse-soft" /> Pedidos ao vivo
+            </p>
+            <p className="text-sm font-semibold">{liveOrders.length} pedido(s) em andamento</p>
+            <p className="text-[11px] text-muted-foreground">
+              {liveOrders.filter(o => o.status === "em_rota").length} em rota ·{" "}
+              {liveOrders.filter(o => o.status === "carga").length} em carga ·{" "}
+              {liveOrders.filter(o => o.status === "separacao").length} em separação
+            </p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+      )}
 
       {/* Alerts */}
       <section className="mt-6">

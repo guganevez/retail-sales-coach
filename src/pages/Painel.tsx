@@ -1,50 +1,132 @@
 import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
-import { clients, formatBRL, formatPct, salesperson } from "@/lib/mock";
-import { Trophy, Users, TrendingDown, UserCircle2, UsersRound } from "lucide-react";
+import { clients, formatBRL, formatPct } from "@/lib/mock";
+import { Trophy, Users, TrendingDown, UserCircle2, UsersRound, Building2 } from "lucide-react";
 import { useProfile, ROLE_LABEL } from "@/lib/profile";
 import { cn } from "@/lib/utils";
-
-const ranking = [
-  { name: "Camila Tavares",    sold: 318420, margin: 9.8,  deals: 142 },
-  { name: "Rafael Moreira",    sold: 192480, margin: 8.4,  deals: 96, me: true },
-  { name: "Luís Henrique",     sold: 174900, margin: 7.6,  deals: 88 },
-  { name: "Mariana Castro",    sold: 158300, margin: 11.2, deals: 71 },
-  { name: "André Bittencourt", sold: 121540, margin: 6.4,  deals: 64 },
-];
+import {
+  reps, supervisors, manager,
+  kpisForManager, kpisForRep, kpisForSupervisor, aggregate,
+} from "@/lib/team";
 
 const Painel = () => {
-  const { role, scope, setScope, profile } = useProfile();
-  const [selected, setSelected] = useState<string | null>(null);
+  const {
+    role, scope, setScope,
+    selectedRepId, setSelectedRepId,
+    selectedSupervisorId, setSelectedSupervisorId,
+  } = useProfile();
 
-  const isManagerView = role === "supervisor" || role === "gerente";
-  const effectiveScope = isManagerView ? scope : "individual";
+  // Defaults para drill-down
+  const [localRepId, setLocalRepId] = useState<string | null>(selectedRepId);
+
+  // ================== Dados conforme papel ==================
+  // Vendedor: vê só os próprios KPIs
+  // Supervisor: vê total da sua equipe + ranking dos seus 3 vendedores; pode drill em 1 vendedor
+  // Gerente: vê total geral + comparativo dos 2 supervisores; pode drill em 1 supervisor
+
+  let kpis = { sold: 0, goal: 0, deals: 0, margin: 0, ticket: 0, commission: 0, goalPct: 0 };
+  let label = "";
+  let viewSupervisor: typeof supervisors[number] | null = null;
+
+  if (role === "vendedor") {
+    kpis = kpisForRep("v1");
+    label = reps.find(r => r.id === "v1")!.name;
+  } else if (role === "supervisor") {
+    const supId = "s1"; // perfil demo
+    if (scope === "individual" && localRepId) {
+      kpis = kpisForRep(localRepId);
+      label = reps.find(r => r.id === localRepId)!.name;
+    } else {
+      kpis = kpisForSupervisor(supId);
+      label = supervisors.find(s => s.id === supId)!.team;
+    }
+    viewSupervisor = supervisors.find(s => s.id === supId)!;
+  } else {
+    // gerente
+    if (selectedSupervisorId) {
+      kpis = kpisForSupervisor(selectedSupervisorId);
+      const sup = supervisors.find(s => s.id === selectedSupervisorId)!;
+      label = sup.team;
+      viewSupervisor = sup;
+    } else {
+      kpis = kpisForManager();
+      label = `Direção · ${reps.length} vendedores`;
+    }
+  }
+
+  // Ranking geral (sempre disponível p/ supervisor e gerente)
+  const ranking = role === "gerente"
+    ? (selectedSupervisorId
+        ? viewSupervisor!.reps
+        : [...reps].sort((a, b) => b.sold - a.sold))
+    : role === "supervisor"
+      ? viewSupervisor!.reps
+      : [];
 
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
-  const teamSold = ranking.reduce((s, r) => s + r.sold, 0);
-  const teamMargin = ranking.reduce((s, r) => s + r.margin, 0) / ranking.length;
-  const teamDeals = ranking.reduce((s, r) => s + r.deals, 0);
-  const teamTicket = teamSold / teamDeals;
-  const teamCommission = ranking.reduce((s, r) => s + r.sold * 0.022, 0);
-
-  // Métricas individuais (vendedor selecionado, ou "eu" se vendedor)
-  const targetRep = isManagerView
-    ? ranking.find(r => r.name === selected) || ranking.find(r => r.me)!
-    : ranking.find(r => r.me)!;
-  const indCommission = targetRep.sold * 0.022;
-  const indTicket = targetRep.sold / targetRep.deals;
-
-  const showing = effectiveScope === "equipe"
-    ? { sold: teamSold, margin: teamMargin, ticket: teamTicket, commission: teamCommission, label: "Equipe" }
-    : { sold: targetRep.sold, margin: targetRep.margin, ticket: indTicket, commission: indCommission, label: targetRep.name };
 
   return (
-    <MobileShell title="Painel gerencial" subtitle={isManagerView ? `${ROLE_LABEL[role]} · ${profile.team || ""}` : "Sua performance"}>
-      {isManagerView && (
+    <MobileShell title="Painel gerencial" subtitle={role === "vendedor" ? "Sua performance" : `${ROLE_LABEL[role]} · ${label}`}>
+      {/* === GERENTE: comparativo de supervisores === */}
+      {role === "gerente" && (
+        <section className="mb-4">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Building2 className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Equipes</h2>
+          </div>
+          <div className="grid gap-2">
+            <button
+              onClick={() => setSelectedSupervisorId(null)}
+              className={cn(
+                "rounded-2xl p-3 text-left shadow-soft transition",
+                !selectedSupervisorId ? "bg-primary text-primary-foreground" : "bg-card"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase opacity-80">Visão consolidada</p>
+                  <p className="text-sm font-semibold">{manager.area}</p>
+                </div>
+                <p className="text-sm font-bold num">{formatBRL(kpisForManager().sold)}</p>
+              </div>
+            </button>
+            {supervisors.map(s => {
+              const k = kpisForSupervisor(s.id);
+              const active = selectedSupervisorId === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedSupervisorId(active ? null : s.id)}
+                  className={cn(
+                    "rounded-2xl p-3 text-left shadow-soft transition",
+                    active ? "bg-primary text-primary-foreground" : "bg-card"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className={cn("text-[10px] font-bold uppercase", active ? "opacity-80" : "text-muted-foreground")}>
+                        {s.team}
+                      </p>
+                      <p className="truncate text-sm font-semibold">{s.name}</p>
+                      <p className={cn("text-[11px]", active ? "opacity-80" : "text-muted-foreground")}>
+                        {s.reps.length} vendedores · {k.deals} pedidos · margem {formatPct(k.margin)}
+                      </p>
+                    </div>
+                    <p className="text-sm font-bold num">{formatBRL(k.sold)}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* === SUPERVISOR: toggle equipe x vendedor === */}
+      {role === "supervisor" && (
         <div className="mb-3 flex items-center gap-1 rounded-2xl bg-card p-1 shadow-soft">
           <button
-            onClick={() => { setScope("equipe"); setSelected(null); }}
+            onClick={() => { setScope("equipe"); setLocalRepId(null); setSelectedRepId(null); }}
             className={cn(
               "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition",
               scope === "equipe" ? "bg-primary text-primary-foreground shadow-glow" : "text-muted-foreground"
@@ -64,17 +146,15 @@ const Painel = () => {
         </div>
       )}
 
-      {isManagerView && scope === "individual" && (
+      {role === "supervisor" && scope === "individual" && (
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {ranking.map(r => (
+          {viewSupervisor!.reps.map(r => (
             <button
-              key={r.name}
-              onClick={() => setSelected(r.name)}
+              key={r.id}
+              onClick={() => { setLocalRepId(r.id); setSelectedRepId(r.id); }}
               className={cn(
                 "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                (selected === r.name || (!selected && r.me))
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground"
+                localRepId === r.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
               )}
             >
               {r.name.split(" ")[0]}
@@ -84,53 +164,104 @@ const Painel = () => {
       )}
 
       <p className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-        Visualizando: <strong className="text-foreground">{showing.label}</strong>
+        Visualizando: <strong className="text-foreground">{label}</strong>
       </p>
 
+      {/* === KPIs principais === */}
       <section className="grid grid-cols-2 gap-3">
-        <StatCard label="Faturamento" value={formatBRL(showing.sold)} hint="Mês corrente" />
-        <StatCard label="Ticket médio" value={formatBRL(showing.ticket)} />
-        <StatCard label="Margem média" value={formatPct(showing.margin)} tone={showing.margin >= 8 ? "success" : "warning"} />
-        <StatCard label="Comissão prev." value={formatBRL(showing.commission)} tone="success" />
+        <StatCard label="Faturamento" value={formatBRL(kpis.sold)} hint={`Meta ${formatBRL(kpis.goal)}`} />
+        <StatCard label="Ticket médio" value={formatBRL(kpis.ticket)} hint={`${kpis.deals} pedidos`} />
+        <StatCard label="Margem média" value={formatPct(kpis.margin)} tone={kpis.margin >= 8 ? "success" : "warning"} />
+        <StatCard label="Comissão prev." value={formatBRL(kpis.commission)} tone="success" />
       </section>
 
-      {(role !== "vendedor") && (
+      <section className="mt-3 rounded-2xl bg-card p-3 shadow-soft">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Atingimento da meta</span>
+          <span className="font-bold num">{kpis.goalPct.toFixed(0)}%</span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn("h-full rounded-full",
+              kpis.goalPct >= 100 ? "bg-success" : kpis.goalPct >= 70 ? "bg-primary" : "bg-warning"
+            )}
+            style={{ width: `${Math.min(100, kpis.goalPct)}%` }}
+          />
+        </div>
+      </section>
+
+      {/* === Ranking de vendedores (supervisor + gerente) === */}
+      {role !== "vendedor" && ranking.length > 0 && (
         <section className="mt-5">
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
-            <Trophy className="h-4 w-4 text-warning" /> Ranking de vendedores
+            <Trophy className="h-4 w-4 text-warning" />
+            Ranking {role === "gerente" && !selectedSupervisorId ? "geral" : "da equipe"}
           </h2>
           <div className="space-y-2">
-            {ranking.map((r, i) => (
-              <button
-                key={r.name}
-                onClick={() => { setScope("individual"); setSelected(r.name); }}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-2xl p-3 shadow-soft text-left transition",
-                  r.me ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card",
-                  selected === r.name && "ring-2 ring-primary"
-                )}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={cn(
-                    "grid h-8 w-8 place-items-center rounded-full text-xs font-bold",
-                    i === 0 ? "bg-warning text-warning-foreground" : "bg-muted text-muted-foreground"
-                  )}>
-                    {i + 1}º
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">
-                      {r.name}{r.me && <span className="ml-1 text-[10px] text-primary">(você)</span>}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">{r.deals} pedidos · margem {formatPct(r.margin)}</p>
-                  </div>
-                </div>
-                <p className="text-sm font-bold num">{formatBRL(r.sold)}</p>
-              </button>
-            ))}
+            {ranking
+              .slice()
+              .sort((a, b) => b.sold - a.sold)
+              .map((r, i) => {
+                const isMe = false; // demo: o "eu" só aparece como vendedor (visão diferente)
+                const k = kpisForRep(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => { setScope("individual"); setLocalRepId(r.id); setSelectedRepId(r.id); }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-2xl p-3 shadow-soft text-left transition",
+                      isMe ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card",
+                      localRepId === r.id && "ring-2 ring-primary"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={cn(
+                        "grid h-8 w-8 place-items-center rounded-full text-xs font-bold",
+                        i === 0 ? "bg-warning text-warning-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {i + 1}º
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{r.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {r.region} · {r.deals} pedidos · margem {formatPct(r.margin)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold num">{formatBRL(r.sold)}</p>
+                      <p className="text-[10px] text-muted-foreground num">{k.goalPct.toFixed(0)}% meta</p>
+                    </div>
+                  </button>
+                );
+              })}
           </div>
         </section>
       )}
 
+      {/* === Conferência hierárquica === */}
+      {role === "gerente" && (
+        <section className="mt-5 rounded-2xl border border-border bg-card p-3 shadow-soft">
+          <h3 className="text-xs font-bold uppercase text-muted-foreground">Soma conferida</h3>
+          <div className="mt-2 space-y-1 text-xs">
+            {supervisors.map(s => {
+              const k = kpisForSupervisor(s.id);
+              return (
+                <div key={s.id} className="flex justify-between">
+                  <span className="text-muted-foreground">{s.team}</span>
+                  <span className="font-bold num">{formatBRL(k.sold)}</span>
+                </div>
+              );
+            })}
+            <div className="mt-1 flex justify-between border-t border-border pt-1">
+              <span className="font-semibold">Total geral</span>
+              <span className="font-bold text-primary num">{formatBRL(kpisForManager().sold)}</span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* === Inativos === */}
       <section className="mt-5">
         <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
           <TrendingDown className="h-4 w-4 text-warning" /> Clientes inativos ({inactives.length})
@@ -148,6 +279,7 @@ const Painel = () => {
         </div>
       </section>
 
+      {/* === Carteira === */}
       <section className="mt-5 rounded-2xl bg-card p-4 shadow-soft">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold"><Users className="h-4 w-4" /> Carteira</h2>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -164,11 +296,6 @@ const Painel = () => {
             <p className="text-[11px] text-muted-foreground">Bloq.</p>
           </div>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          {role === "vendedor"
-            ? `Sua margem (${formatPct(salesperson.avgMargin)}) está acima da média da equipe (${formatPct(teamMargin)}). Continue assim!`
-            : `Margem média da equipe: ${formatPct(teamMargin)}. Top vendedor: ${ranking[0].name}.`}
-        </p>
       </section>
     </MobileShell>
   );

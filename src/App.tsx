@@ -10,6 +10,8 @@ import NovoPedido from "./pages/NovoPedido.tsx";
 import Painel from "./pages/Painel.tsx";
 import Alertas from "./pages/Alertas.tsx";
 import Orcamentos from "./pages/Orcamentos.tsx";
+import Pedidos from "./pages/Pedidos.tsx";
+import PedidoDetalhe from "./pages/PedidoDetalhe.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { ProfileProvider } from "./lib/profile";
 import { QuotesProvider } from "./lib/quotes";
@@ -31,6 +33,8 @@ const App = () => (
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/clientes/:id" element={<ClienteDetalhe />} />
                 <Route path="/pedido/novo" element={<NovoPedido />} />
+                <Route path="/pedidos" element={<Pedidos />} />
+                <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
                 <Route path="/orcamentos" element={<Orcamentos />} />
                 <Route path="/painel" element={<Painel />} />
                 <Route path="/alertas" element={<Alertas />} />

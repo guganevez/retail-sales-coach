@@ -9,7 +9,10 @@ import ClienteDetalhe from "./pages/ClienteDetalhe.tsx";
 import NovoPedido from "./pages/NovoPedido.tsx";
 import Painel from "./pages/Painel.tsx";
 import Alertas from "./pages/Alertas.tsx";
+import Orcamentos from "./pages/Orcamentos.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { ProfileProvider } from "./lib/profile";
+import { QuotesProvider } from "./lib/quotes";
 
 const queryClient = new QueryClient();
 
@@ -18,18 +21,23 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/clientes/:id" element={<ClienteDetalhe />} />
-          <Route path="/pedido/novo" element={<NovoPedido />} />
-          <Route path="/painel" element={<Painel />} />
-          <Route path="/alertas" element={<Alertas />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <ProfileProvider>
+        <QuotesProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes/:id" element={<ClienteDetalhe />} />
+              <Route path="/pedido/novo" element={<NovoPedido />} />
+              <Route path="/orcamentos" element={<Orcamentos />} />
+              <Route path="/painel" element={<Painel />} />
+              <Route path="/alertas" element={<Alertas />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </QuotesProvider>
+      </ProfileProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

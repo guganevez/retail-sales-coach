@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown } from "lucide-react";
+import { Home, Users, ShoppingCart, BarChart3, Bell, Plus, Search, FileText, ChevronDown, Truck } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 import { smartAlerts } from "@/lib/mock";
@@ -16,9 +16,9 @@ interface Props {
 
 const tabs = [
   { to: "/", label: "Início", icon: Home, end: true },
-  { to: "/clientes", label: "Clientes", icon: Users },
+  { to: "/pedidos", label: "Rastreio", icon: Truck },
   { to: "/pedido/novo", label: "Pedido", icon: ShoppingCart, primary: true },
-  { to: "/orcamentos", label: "Orçam.", icon: FileText },
+  { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/painel", label: "Painel", icon: BarChart3 },
 ];
 

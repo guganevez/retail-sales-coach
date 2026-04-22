@@ -79,22 +79,92 @@ export function MobileShell({ title, subtitle, children, rightSlot, hideTopBar }
             </div>
 
             {roleMenuOpen && (
-              <div className="mt-3 rounded-2xl bg-white/12 p-1.5 backdrop-blur">
-                {(["vendedor", "supervisor", "gerente"] as Role[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => { setRole(r); setRoleMenuOpen(false); }}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition",
-                      role === r ? "bg-white/25 font-semibold" : "hover:bg-white/10"
-                    )}
-                  >
-                    <span>{ROLE_LABEL[r]}</span>
-                    <span className="text-[10px] opacity-75">
-                      {r === "vendedor" ? "Carteira própria" : r === "supervisor" ? "Equipe" : "Visão geral"}
-                    </span>
-                  </button>
-                ))}
+              <div className="mt-3 space-y-2">
+                <div className="rounded-2xl bg-white/12 p-1.5 backdrop-blur">
+                  <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide opacity-70">Papel</p>
+                  {(["vendedor", "supervisor", "gerente"] as Role[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => { setRole(r); }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition",
+                        role === r ? "bg-white/25 font-semibold" : "hover:bg-white/10"
+                      )}
+                    >
+                      <span>{ROLE_LABEL[r]}</span>
+                      <span className="text-[10px] opacity-75">
+                        {r === "vendedor" ? "Carteira própria" : r === "supervisor" ? "Equipe" : "Visão geral"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {role === "vendedor" && (
+                  <div className="rounded-2xl bg-white/12 p-1.5 backdrop-blur">
+                    <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide opacity-70">
+                      Sou o vendedor
+                    </p>
+                    <div className="max-h-64 overflow-y-auto">
+                      {reps.map((r) => {
+                        const sup = supervisors.find(s => s.id === r.supervisorId);
+                        const active = activeRepId === r.id;
+                        return (
+                          <button
+                            key={r.id}
+                            onClick={() => { setActiveRepId(r.id); setRoleMenuOpen(false); }}
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition",
+                              active ? "bg-white/25" : "hover:bg-white/10"
+                            )}
+                          >
+                            <span className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-[11px] font-bold">
+                              {r.initials}
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block truncate text-sm font-semibold">{r.name}</span>
+                              <span className="block truncate text-[10px] opacity-75">
+                                {r.region} · {sup?.team}
+                              </span>
+                            </span>
+                            {active && <Check className="h-4 w-4 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {role === "supervisor" && (
+                  <div className="rounded-2xl bg-white/12 p-1.5 backdrop-blur">
+                    <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide opacity-70">
+                      Sou o supervisor
+                    </p>
+                    {supervisors.map((s) => {
+                      const active = activeSupervisorId === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => { setActiveSupervisorId(s.id); setRoleMenuOpen(false); }}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition",
+                            active ? "bg-white/25" : "hover:bg-white/10"
+                          )}
+                        >
+                          <span className="grid h-8 w-8 place-items-center rounded-full bg-white/20 text-[11px] font-bold">
+                            {s.initials}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block truncate text-sm font-semibold">{s.name}</span>
+                            <span className="block truncate text-[10px] opacity-75">
+                              {s.team} · {s.reps.length} vendedores
+                            </span>
+                          </span>
+                          {active && <Check className="h-4 w-4 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

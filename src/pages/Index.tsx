@@ -1,21 +1,29 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio, CalendarDays, Zap } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
-import { DailyGoalCard } from "@/components/DailyGoalCard";
-import { clients, formatBRL, formatPct, products, salesperson, smartAlerts } from "@/lib/mock";
+import { DailyGoalCard, RealizedSource } from "@/components/DailyGoalCard";
+import { clients, formatBRL, formatPct, products, salesperson, smartAlerts, recentOrders } from "@/lib/mock";
 import { useDraft } from "@/lib/draft";
 import { computeTotals } from "@/lib/calc";
 import { useProfile } from "@/lib/profile";
 import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/tracking";
+import { useHolidays } from "@/lib/holidays";
+import { useAgenda, todayISO } from "@/lib/agenda";
+import { computeDailyPace } from "@/lib/workdays";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
 const Index = () => {
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
   const topAlerts = smartAlerts.slice(0, 3);
   const { draft, hasDraft, clearDraft } = useDraft();
   const { role, profile } = useProfile();
+  const { holidays } = useHolidays();
+  const { visits } = useAgenda();
+  const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
   const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
   const draftTotals = draft ? computeTotals(draft.items, productMap) : null;
 
@@ -27,6 +35,36 @@ const Index = () => {
       : ordersForManager();
   const liveOrders = allTracked.filter(o => ["separacao","carga","em_rota"].includes(o.status));
 
+  // Breakdown do realizado de hoje
+  const today = todayISO();
+  const sourcesFromVisits: RealizedSource[] = visits
+    .filter(v => v.date === today && v.status === "concluida" && v.realized && v.realized > 0)
+    .map(v => {
+      const c = clientMap[v.clientId];
+      return {
+        label: c?.fantasy ?? v.clientId,
+        value: v.realized!,
+        hint: c ? `${c.city} · ${c.segment}` : undefined,
+      };
+    });
+  const sources: RealizedSource[] = sourcesFromVisits.length > 0
+    ? sourcesFromVisits
+    : recentOrders.slice(0, 3).map((o, i) => {
+        const c = clientMap[o.clientId];
+        const weight = [0.55, 0.3, 0.15][i] ?? 0;
+        return {
+          label: c?.fantasy ?? o.clientId,
+          value: Math.round(salesperson.achievedToday * weight),
+          hint: c ? `${c.city} · ${c.segment}` : undefined,
+        };
+      });
+
+  // Risco de meta
+  const pace = computeDailyPace(salesperson.goalMonth, salesperson.achievedMonth, new Date(), holidaySet);
+  const todayPctActual = pace.dailyGoal > 0 ? (salesperson.achievedToday / pace.dailyGoal) * 100 : 0;
+  const isAtRisk = pace.isWorkdayToday && todayPctActual < 80;
+  const todaysVisits = visits.filter(v => v.date === today);
+
   return (
     <MobileShell
       subtitle="Resumo de hoje"
@@ -37,6 +75,8 @@ const Index = () => {
             monthlyGoal={salesperson.goalMonth}
             achievedMonth={salesperson.achievedMonth}
             achievedToday={salesperson.achievedToday}
+            holidays={holidaySet}
+            sources={sources}
             compact
           />
         </div>

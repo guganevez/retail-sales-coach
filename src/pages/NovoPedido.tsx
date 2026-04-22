@@ -33,26 +33,30 @@ const NovoPedido = () => {
   const navigate = useNavigate();
   const { addQuote } = useQuotes();
   const { profile } = useProfile();
+  const { draft, saveDraft, clearDraft } = useDraft();
 
   const preselected = params.get("cliente");
   const initialType = (params.get("tipo") as OrderType) || "entrega";
   const preselectedProduct = params.get("produto");
+  const resume = params.get("retomar") === "1" && !!draft;
 
-  const [clientId, setClientId] = useState<string | null>(preselected);
-  const [pickerOpen, setPickerOpen] = useState(!preselected);
+  const [clientId, setClientId] = useState<string | null>(resume ? draft!.clientId : preselected);
+  const [pickerOpen, setPickerOpen] = useState(resume ? !draft!.clientId : !preselected);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>(initialType);
-  const [shift, setShift] = useState<Shift>("manha");
-  const [paymentTerm, setPaymentTerm] = useState("28 dias");
+  const [items, setItems] = useState<OrderItem[]>(resume ? draft!.items : []);
+  const [orderType, setOrderType] = useState<OrderType>(resume ? draft!.orderType : initialType);
+  const [shift, setShift] = useState<Shift>(resume ? draft!.shift : "manha");
+  const [paymentTerm, setPaymentTerm] = useState(resume ? draft!.paymentTerm : "28 dias");
   const [step, setStep] = useState<Step>("edit");
-  const [signature, setSignature] = useState<string | undefined>();
-  const [signedBy, setSignedBy] = useState("");
+  const [signature, setSignature] = useState<string | undefined>(resume ? draft!.signature : undefined);
+  const [signedBy, setSignedBy] = useState(resume ? draft!.signedBy : "");
   const [validUntil, setValidUntil] = useState(() => {
+    if (resume && draft!.validUntil) return draft!.validUntil;
     const d = new Date();
     d.setDate(d.getDate() + 15);
     return d.toISOString().slice(0, 10);
   });
+  const [showSignatureError, setShowSignatureError] = useState(false);
 
   const client = clients.find(c => c.id === clientId) || null;
   const prices = client ? (lastPriceMap[client.id] || {}) : {};

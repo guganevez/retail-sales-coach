@@ -271,8 +271,9 @@ const NovoPedido = () => {
             )}
             <button
               onClick={() => {
+                clearDraft();
                 setStep("edit"); setItems([]); setClientId(null); setPickerOpen(true);
-                setSignature(undefined); setSignedBy("");
+                setSignature(undefined); setSignedBy(""); setShowSignatureError(false);
               }}
               className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow"
             >
@@ -368,27 +369,47 @@ const NovoPedido = () => {
           </div>
         </section>
 
-        {/* Assinatura na entrega */}
+        {/* Assinatura na entrega — OBRIGATÓRIA */}
         {requiresSignature && (
-          <section className="mt-4 rounded-2xl bg-card p-3 shadow-soft">
-            <h3 className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold">
-              <PenLine className="h-4 w-4 text-primary" /> Assinatura do cliente (recebimento)
+          <section
+            id="signature-section"
+            className={cn(
+              "mt-4 rounded-2xl p-3 shadow-soft transition",
+              showSignatureError && (!signature || signedBy.trim().length < 2)
+                ? "bg-danger-soft border-2 border-danger"
+                : "bg-card border-2 border-transparent"
+            )}
+          >
+            <h3 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold">
+              <PenLine className="h-4 w-4 text-primary" /> Assinatura do recebedor
+              <span className="ml-1 rounded-md bg-danger px-1.5 py-0.5 text-[10px] font-bold text-danger-foreground">
+                OBRIGATÓRIO
+              </span>
             </h3>
             <p className="mb-2 text-[11px] text-muted-foreground">
-              O cliente deve assinar abaixo confirmando o recebimento do pedido.
+              Para entregas é necessário capturar a assinatura e o nome de quem recebeu o pedido.
             </p>
             <SignaturePad value={signature} onChange={setSignature} />
             <input
               type="text"
               value={signedBy}
               onChange={(e) => setSignedBy(e.target.value)}
-              placeholder="Nome de quem recebeu"
-              className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              placeholder="Nome de quem recebeu *"
+              className={cn(
+                "mt-2 h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary",
+                showSignatureError && signedBy.trim().length < 2 ? "border-danger" : "border-border"
+              )}
             />
-            {!signature && (
-              <p className="mt-2 text-[11px] text-warning inline-flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Captura opcional, mas recomendada para comprovação.
-              </p>
+            {showSignatureError && (!signature || signedBy.trim().length < 2) && (
+              <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-danger px-2.5 py-2 text-[11px] font-semibold text-danger-foreground">
+                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Não é possível confirmar o pedido sem
+                  {!signature && " assinatura"}
+                  {!signature && signedBy.trim().length < 2 && " e"}
+                  {signedBy.trim().length < 2 && " nome do recebedor"}.
+                </span>
+              </div>
             )}
           </section>
         )}

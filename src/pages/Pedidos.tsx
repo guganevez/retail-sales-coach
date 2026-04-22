@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { OrderTracking } from "@/components/OrderTracking";
 import { useProfile } from "@/lib/profile";
@@ -9,7 +9,7 @@ import {
 } from "@/lib/tracking";
 import { reps, supervisors } from "@/lib/team";
 import { cn } from "@/lib/utils";
-import { Radio, Search, X, MapPin, Truck } from "lucide-react";
+import { Radio, Search, X, MapPin, Truck, CornerDownLeft, ArrowDown, ArrowUp } from "lucide-react";
 
 const STATUS_FILTERS: { id: TrackingStatus | "todos" | "live"; label: string }[] = [
   { id: "live", label: "Ao vivo" },
@@ -26,6 +26,22 @@ const Pedidos = () => {
   const { role, profile } = useProfile();
   const [filter, setFilter] = useState<TrackingStatus | "todos" | "live">("live");
   const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Atalho "/" foca a busca (quando não estiver em outro input)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const orders: TrackedOrder[] = useMemo(() => {
     if (role === "vendedor") return ordersForRep(profile.id);
@@ -44,13 +60,33 @@ const Pedidos = () => {
     return Array.from(map.values()).sort((a, b) => a.fantasy.localeCompare(b.fantasy));
   }, [orders]);
 
-  // Match de busca por cliente (nome ou cidade)
+  // Match de busca por cliente (nome ou cidade) — com score p/ ranquear sugestões
   const q = query.trim().toLowerCase();
-  const matchedClients = q
-    ? clientList.filter(c =>
-        c.fantasy.toLowerCase().includes(q) || c.city.toLowerCase().includes(q),
-      )
-    : [];
+  const scored = useMemo(() => {
+    if (!q) return [];
+    return clientList
+      .map(c => {
+        const f = c.fantasy.toLowerCase();
+        const ct = c.city.toLowerCase();
+        let score = 0;
+        let matchField: "fantasy" | "city" | null = null;
+        if (f === q) { score = 100; matchField = "fantasy"; }
+        else if (f.startsWith(q)) { score = 80; matchField = "fantasy"; }
+        else if (f.includes(q)) { score = 50; matchField = "fantasy"; }
+        else if (ct.startsWith(q)) { score = 40; matchField = "city"; }
+        else if (ct.includes(q)) { score = 20; matchField = "city"; }
+        // bônus: clientes com pedidos ao vivo aparecem antes
+        const live = c.orders.some(o => ["separacao","carga","em_rota"].includes(o.status));
+        if (live) score += 5;
+        // desempate: mais pedidos primeiro
+        score += Math.min(4, c.orders.length);
+        return { client: c, score, matchField };
+      })
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }, [q, clientList]);
+  const matchedClients = scored.map(s => s.client);
+  const suggestions = scored.slice(0, 6);
 
   const filtered = useMemo(() => {
     let base = orders;
@@ -93,19 +129,122 @@ const Pedidos = () => {
         <Stat label="Entregues" value={orders.filter(o => o.status === "entregue").length} tone="success" />
       </div>
 
-      {/* Busca por cliente — atalho rápido */}
-      <div className="mb-3 flex items-center gap-2 rounded-2xl bg-card px-3 py-2 shadow-soft">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar cliente, fantasia ou cidade…"
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-        {query && (
-          <button onClick={() => setQuery("")} aria-label="Limpar busca">
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
+      {/* Busca por cliente — autocomplete + atalhos */}
+      <div className="relative mb-3">
+        <div className="flex items-center gap-2 rounded-2xl bg-card px-3 py-2 shadow-soft">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setHighlight(0); setShowSuggest(true); }}
+            onFocus={() => setShowSuggest(true)}
+            onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+            onKeyDown={(e) => {
+              if (!suggestions.length) {
+                if (e.key === "Escape") { setQuery(""); setShowSuggest(false); }
+                return;
+              }
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlight((h) => (h + 1) % suggestions.length);
+                setShowSuggest(true);
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlight((h) => (h - 1 + suggestions.length) % suggestions.length);
+                setShowSuggest(true);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const pick = suggestions[highlight]?.client;
+                if (pick) {
+                  setQuery(pick.fantasy);
+                  setShowSuggest(false);
+                  inputRef.current?.blur();
+                }
+              } else if (e.key === "Escape") {
+                if (showSuggest) setShowSuggest(false);
+                else { setQuery(""); inputRef.current?.blur(); }
+              } else if (e.key === "Tab" && suggestions[highlight]) {
+                // Tab = autocompletar com a sugestão sem fechar
+                e.preventDefault();
+                setQuery(suggestions[highlight].client.fantasy);
+              }
+            }}
+            placeholder='Buscar cliente, fantasia ou cidade…  (atalho: " / ")'
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            aria-autocomplete="list"
+            aria-expanded={showSuggest && suggestions.length > 0}
+            aria-controls="cliente-suggest-list"
+            aria-activedescendant={suggestions[highlight] ? `sg-${suggestions[highlight].client.id}` : undefined}
+          />
+          {!query && (
+            <kbd className="hidden sm:inline-flex h-5 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-bold text-muted-foreground">
+              /
+            </kbd>
+          )}
+          {query && (
+            <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="Limpar busca">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
+        {/* Painel de sugestões */}
+        {showSuggest && suggestions.length > 0 && (
+          <ul
+            id="cliente-suggest-list"
+            role="listbox"
+            className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-2xl border border-border bg-card shadow-glow"
+          >
+            {suggestions.map((s, i) => {
+              const c = s.client;
+              const live = c.orders.some(o => ["separacao","carga","em_rota"].includes(o.status));
+              const isOn = i === highlight;
+              return (
+                <li
+                  id={`sg-${c.id}`}
+                  key={c.id}
+                  role="option"
+                  aria-selected={isOn}
+                  onMouseEnter={() => setHighlight(i)}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // evita blur antes do click
+                    setQuery(c.fantasy);
+                    setShowSuggest(false);
+                  }}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm transition",
+                    isOn ? "bg-primary/10" : "hover:bg-muted",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      <MarkText text={c.fantasy} term={q} />
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      <MapPin className="mr-0.5 inline h-3 w-3" />
+                      <MarkText text={c.city} term={q} /> · {c.orders.length} pedido(s)
+                      {s.matchField === "city" && <span className="ml-1 text-[9px] uppercase opacity-70">via cidade</span>}
+                    </p>
+                  </div>
+                  {live && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                      <Radio className="h-2.5 w-2.5 animate-pulse-soft" /> AO VIVO
+                    </span>
+                  )}
+                  {isOn && <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                </li>
+              );
+            })}
+            <li className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-3 py-1.5 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1"><ArrowUp className="h-3 w-3" /><ArrowDown className="h-3 w-3" /> navegar</span>
+                <span className="inline-flex items-center gap-1"><CornerDownLeft className="h-3 w-3" /> selecionar</span>
+                <span>Tab autocompletar</span>
+                <span>Esc fechar</span>
+              </span>
+              <span>{suggestions.length} sugestão(ões)</span>
+            </li>
+          </ul>
         )}
       </div>
 
@@ -224,6 +363,19 @@ const Pedidos = () => {
     </MobileShell>
   );
 };
+
+function MarkText({ text, term }: { text: string; term: string }) {
+  if (!term) return <>{text}</>;
+  const i = text.toLowerCase().indexOf(term.toLowerCase());
+  if (i < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, i)}
+      <mark className="rounded bg-primary/20 px-0.5 text-foreground">{text.slice(i, i + term.length)}</mark>
+      {text.slice(i + term.length)}
+    </>
+  );
+}
 
 function Stat({ label, value, tone, live }: { label: string; value: number; tone?: "success"; live?: boolean }) {
   return (

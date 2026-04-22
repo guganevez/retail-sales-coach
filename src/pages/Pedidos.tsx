@@ -129,19 +129,122 @@ const Pedidos = () => {
         <Stat label="Entregues" value={orders.filter(o => o.status === "entregue").length} tone="success" />
       </div>
 
-      {/* Busca por cliente — atalho rápido */}
-      <div className="mb-3 flex items-center gap-2 rounded-2xl bg-card px-3 py-2 shadow-soft">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar cliente, fantasia ou cidade…"
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-        {query && (
-          <button onClick={() => setQuery("")} aria-label="Limpar busca">
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
+      {/* Busca por cliente — autocomplete + atalhos */}
+      <div className="relative mb-3">
+        <div className="flex items-center gap-2 rounded-2xl bg-card px-3 py-2 shadow-soft">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setHighlight(0); setShowSuggest(true); }}
+            onFocus={() => setShowSuggest(true)}
+            onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+            onKeyDown={(e) => {
+              if (!suggestions.length) {
+                if (e.key === "Escape") { setQuery(""); setShowSuggest(false); }
+                return;
+              }
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlight((h) => (h + 1) % suggestions.length);
+                setShowSuggest(true);
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlight((h) => (h - 1 + suggestions.length) % suggestions.length);
+                setShowSuggest(true);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const pick = suggestions[highlight]?.client;
+                if (pick) {
+                  setQuery(pick.fantasy);
+                  setShowSuggest(false);
+                  inputRef.current?.blur();
+                }
+              } else if (e.key === "Escape") {
+                if (showSuggest) setShowSuggest(false);
+                else { setQuery(""); inputRef.current?.blur(); }
+              } else if (e.key === "Tab" && suggestions[highlight]) {
+                // Tab = autocompletar com a sugestão sem fechar
+                e.preventDefault();
+                setQuery(suggestions[highlight].client.fantasy);
+              }
+            }}
+            placeholder='Buscar cliente, fantasia ou cidade…  (atalho: " / ")'
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            aria-autocomplete="list"
+            aria-expanded={showSuggest && suggestions.length > 0}
+            aria-controls="cliente-suggest-list"
+            aria-activedescendant={suggestions[highlight] ? `sg-${suggestions[highlight].client.id}` : undefined}
+          />
+          {!query && (
+            <kbd className="hidden sm:inline-flex h-5 select-none items-center rounded border border-border bg-muted px-1.5 text-[10px] font-bold text-muted-foreground">
+              /
+            </kbd>
+          )}
+          {query && (
+            <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="Limpar busca">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
+        {/* Painel de sugestões */}
+        {showSuggest && suggestions.length > 0 && (
+          <ul
+            id="cliente-suggest-list"
+            role="listbox"
+            className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-2xl border border-border bg-card shadow-glow"
+          >
+            {suggestions.map((s, i) => {
+              const c = s.client;
+              const live = c.orders.some(o => ["separacao","carga","em_rota"].includes(o.status));
+              const isOn = i === highlight;
+              return (
+                <li
+                  id={`sg-${c.id}`}
+                  key={c.id}
+                  role="option"
+                  aria-selected={isOn}
+                  onMouseEnter={() => setHighlight(i)}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // evita blur antes do click
+                    setQuery(c.fantasy);
+                    setShowSuggest(false);
+                  }}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm transition",
+                    isOn ? "bg-primary/10" : "hover:bg-muted",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      <Highlight text={c.fantasy} term={q} />
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      <MapPin className="mr-0.5 inline h-3 w-3" />
+                      <Highlight text={c.city} term={q} /> · {c.orders.length} pedido(s)
+                      {s.matchField === "city" && <span className="ml-1 text-[9px] uppercase opacity-70">via cidade</span>}
+                    </p>
+                  </div>
+                  {live && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                      <Radio className="h-2.5 w-2.5 animate-pulse-soft" /> AO VIVO
+                    </span>
+                  )}
+                  {isOn && <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                </li>
+              );
+            })}
+            <li className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-3 py-1.5 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1"><ArrowUp className="h-3 w-3" /><ArrowDown className="h-3 w-3" /> navegar</span>
+                <span className="inline-flex items-center gap-1"><CornerDownLeft className="h-3 w-3" /> selecionar</span>
+                <span>Tab autocompletar</span>
+                <span>Esc fechar</span>
+              </span>
+              <span>{suggestions.length} sugestão(ões)</span>
+            </li>
+          </ul>
         )}
       </div>
 

@@ -1,10 +1,10 @@
 // Ciclo de venda híbrido: usa intervalo médio entre pedidos do cliente quando há histórico,
-// senão cai no padrão por segmento.
+// senão cai no padrão por segmento (com overrides opcionais do usuário).
 
 import { Client, Order } from "./types";
 import { recentOrders } from "./mock";
 
-export const SEGMENT_CYCLE: Record<string, number> = {
+export const SEGMENT_CYCLE_DEFAULTS: Record<string, number> = {
   "Bar": 7,
   "Restaurante": 14,
   "Mercado": 10,
@@ -14,22 +14,18 @@ export const SEGMENT_CYCLE: Record<string, number> = {
   "Adega": 21,
 };
 
+/** Compat: alias antigo. */
+export const SEGMENT_CYCLE = SEGMENT_CYCLE_DEFAULTS;
+
 export const DEFAULT_CYCLE_DAYS = 15;
 
 export interface CycleInfo {
-  /** dias do ciclo recomendado para esse cliente */
   cycleDays: number;
-  /** origem: "historico" (≥2 pedidos) ou "segmento" (fallback) */
   source: "historico" | "segmento";
-  /** dias desde a última compra */
   daysSinceLast: number;
-  /** quantos dias passou (ou faltam) do ciclo. >0 = atrasado */
   overdueDays: number;
-  /** quanto do ciclo já passou (0..1+) */
   ratio: number;
-  /** prioridade derivada: "atrasado" | "no_ciclo" | "ok" */
   priority: "atrasado" | "no_ciclo" | "ok";
-  /** ticket médio do cliente — usado nas projeções */
   expectedTicket: number;
 }
 
@@ -45,10 +41,15 @@ function avgIntervalDays(orders: Order[]): number | null {
   return Math.round(totalDiff / (sorted.length - 1));
 }
 
-export function getCycleInfo(client: Client, orders: Order[] = recentOrders): CycleInfo {
+export function getCycleInfo(
+  client: Client,
+  orders: Order[] = recentOrders,
+  segmentOverrides?: Record<string, number>,
+): CycleInfo {
   const clientOrders = orders.filter(o => o.clientId === client.id);
   const historic = avgIntervalDays(clientOrders);
-  const segment = SEGMENT_CYCLE[client.segment] ?? DEFAULT_CYCLE_DAYS;
+  const cycles = { ...SEGMENT_CYCLE_DEFAULTS, ...(segmentOverrides ?? {}) };
+  const segment = cycles[client.segment] ?? DEFAULT_CYCLE_DAYS;
   const cycleDays = historic ?? segment;
   const source: CycleInfo["source"] = historic ? "historico" : "segmento";
 
@@ -62,19 +63,12 @@ export function getCycleInfo(client: Client, orders: Order[] = recentOrders): Cy
   else priority = "ok";
 
   return {
-    cycleDays,
-    source,
-    daysSinceLast,
-    overdueDays,
-    ratio,
-    priority,
+    cycleDays, source, daysSinceLast, overdueDays, ratio, priority,
     expectedTicket: client.avgTicket,
   };
 }
 
-/** Score para ranquear sugestões: quanto maior, mais urgente. */
 export function suggestionScore(info: CycleInfo): number {
-  // Atrasados ganham peso enorme; ticket alto também sobe.
   const overdueWeight = Math.max(0, info.overdueDays) * 4;
   const cycleWeight = info.ratio >= 0.8 && info.ratio < 1 ? 5 : 0;
   const ticketWeight = info.expectedTicket / 1000;

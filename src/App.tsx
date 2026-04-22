@@ -19,6 +19,7 @@ import { QuotesProvider } from "./lib/quotes";
 import { DraftProvider } from "./lib/draft";
 import { HolidaysProvider } from "./lib/holidays";
 import { AgendaProvider } from "./lib/agenda";
+import { CycleProvider } from "./lib/cycleConfig";
 
 const queryClient = new QueryClient();
 
@@ -29,28 +30,30 @@ const App = () => (
       <Sonner />
       <ProfileProvider>
         <HolidaysProvider>
-          <AgendaProvider>
-            <QuotesProvider>
-              <DraftProvider>
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/clientes" element={<Clientes />} />
-                    <Route path="/clientes/:id" element={<ClienteDetalhe />} />
-                    <Route path="/pedido/novo" element={<NovoPedido />} />
-                    <Route path="/pedidos" element={<Pedidos />} />
-                    <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
-                    <Route path="/orcamentos" element={<Orcamentos />} />
-                    <Route path="/painel" element={<Painel />} />
-                    <Route path="/agenda" element={<Agenda />} />
-                    <Route path="/alertas" element={<Alertas />} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </BrowserRouter>
-              </DraftProvider>
-            </QuotesProvider>
-          </AgendaProvider>
+          <CycleProvider>
+            <AgendaProvider>
+              <QuotesProvider>
+                <DraftProvider>
+                  <BrowserRouter>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/clientes" element={<Clientes />} />
+                      <Route path="/clientes/:id" element={<ClienteDetalhe />} />
+                      <Route path="/pedido/novo" element={<NovoPedido />} />
+                      <Route path="/pedidos" element={<Pedidos />} />
+                      <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
+                      <Route path="/orcamentos" element={<Orcamentos />} />
+                      <Route path="/painel" element={<Painel />} />
+                      <Route path="/agenda" element={<Agenda />} />
+                      <Route path="/alertas" element={<Alertas />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </DraftProvider>
+              </QuotesProvider>
+            </AgendaProvider>
+          </CycleProvider>
         </HolidaysProvider>
       </ProfileProvider>
     </TooltipProvider>

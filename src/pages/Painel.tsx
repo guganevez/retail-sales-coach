@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
-import { clients, formatBRL, formatPct } from "@/lib/mock";
+import { DailyGoalCard } from "@/components/DailyGoalCard";
+import { clients, formatBRL, formatPct, salesperson } from "@/lib/mock";
 import { Trophy, Users, TrendingDown, UserCircle2, UsersRound, Building2 } from "lucide-react";
 import { useProfile, ROLE_LABEL } from "@/lib/profile";
 import { cn } from "@/lib/utils";

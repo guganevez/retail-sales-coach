@@ -27,7 +27,11 @@ export function MobileShell({ title, subtitle, children, rightSlot, hideTopBar }
   const location = useLocation();
   const alertCount = smartAlerts.filter(a => a.severity !== "info").length;
   const [searchOpen, setSearchOpen] = useState(false);
-  const { profile, role, setRole } = useProfile();
+  const {
+    profile, role, setRole,
+    activeRepId, setActiveRepId,
+    activeSupervisorId, setActiveSupervisorId,
+  } = useProfile();
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
 
   return (

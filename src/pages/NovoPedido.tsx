@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Search, X, Plus, Minus, Sparkles, Truck, Package, FileText,
   AlertTriangle, ShieldAlert, CheckCircle2, Repeat, ChevronRight, Tag,
-  CalendarClock, Download, FileDown, MessageCircle, PenLine, ArrowRight, Eye,
+  CalendarClock, Download, FileDown, MessageCircle, PenLine, ArrowRight, Eye, Save,
 } from "lucide-react";
+import { toast } from "sonner";
 import { MobileShell } from "@/components/MobileShell";
 import { ClientStatusBadge } from "@/components/ClientStatusBadge";
 import { HealthPill, HealthDot } from "@/components/HealthDot";
 import { SignaturePad } from "@/components/SignaturePad";
+import { BlockingPanel } from "@/components/BlockingPanel";
+import { ClientHistoryPanel } from "@/components/ClientHistoryPanel";
 import {
   clients, formatBRL, formatPct, frequentByClient, lastPriceMap,
   logistics, products, recentOrders,
@@ -18,6 +21,7 @@ import { computeTotals, marginHealth, priceHealth, itemMarginPct } from "@/lib/c
 import { cn } from "@/lib/utils";
 import { useQuotes } from "@/lib/quotes";
 import { useProfile } from "@/lib/profile";
+import { useDraft } from "@/lib/draft";
 import { exportCSV, exportPDF, shareWhatsApp } from "@/lib/exports";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));

@@ -235,6 +235,7 @@ const Painel = () => {
           monthlyGoal={kpis.goal}
           achievedMonth={kpis.sold}
           achievedToday={role === "vendedor" ? salesperson.achievedToday : Math.round(kpis.sold * 0.05)}
+          holidays={holidaySet}
         />
       </div>
 

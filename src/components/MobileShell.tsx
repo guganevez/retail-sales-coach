@@ -64,6 +64,13 @@ export function MobileShell({ title, subtitle, children, rightSlot, hideTopBar }
                   <Search className="h-5 w-5" />
                 </button>
                 <Link
+                  to="/painel"
+                  className="grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur transition hover:bg-white/25"
+                  aria-label="Painel"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                </Link>
+                <Link
                   to="/alertas"
                   className="relative grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur transition hover:bg-white/25"
                   aria-label="Alertas"

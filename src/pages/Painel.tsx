@@ -126,6 +126,38 @@ const Painel = () => {
               );
             })}
           </div>
+
+          {/* Drill-down: vendedores do supervisor selecionado */}
+          {selectedSupervisorId && viewSupervisor && (
+            <div className="mt-3">
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase text-muted-foreground">Vendedores da equipe</p>
+                {selectedRepId && (
+                  <button
+                    onClick={() => setSelectedRepId(null)}
+                    className="text-[10px] font-bold text-primary"
+                  >
+                    Limpar seleção
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {viewSupervisor.reps.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRepId(selectedRepId === r.id ? null : r.id)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                      selectedRepId === r.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                    )}
+                  >
+                    <UserCircle2 className="mr-1 inline h-3 w-3" />
+                    {r.name.split(" ")[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

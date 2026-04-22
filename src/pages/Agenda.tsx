@@ -1,18 +1,22 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  CalendarDays, Plus, Check, Clock, AlertTriangle, Sparkles, Trash2,
-  CalendarPlus, Zap, TrendingDown, X, Target, MapPin,
+  CalendarDays, Plus, Clock, AlertTriangle, Sparkles, Trash2,
+  CalendarPlus, Zap, TrendingDown, X, Target, MapPin, Sun, Moon, Sunset, Check,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
-import { useAgenda, suggestionsForDate, todayISO, Visit } from "@/lib/agenda";
+import { useAgenda, suggestionsForDate, todayISO, Visit, VisitShift } from "@/lib/agenda";
 import { useHolidays } from "@/lib/holidays";
+import { useCycleConfig } from "@/lib/cycleConfig";
 import { computeDailyPace } from "@/lib/workdays";
 import { clients, formatBRL, salesperson } from "@/lib/mock";
 import { getCycleInfo } from "@/lib/cycle";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { CheckInOut } from "@/components/CheckInOut";
+import { CycleEditor } from "@/components/CycleEditor";
+import { RouteSuggestion } from "@/components/RouteSuggestion";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -24,21 +28,33 @@ const formatDateLabel = (iso: string) => {
   return `${dayName.replace(".", "")} · ${dayShort}`;
 };
 
+const SHIFT_OPTIONS: { value: VisitShift; label: string; icon: typeof Sun }[] = [
+  { value: "manha", label: "Manhã", icon: Sun },
+  { value: "tarde", label: "Tarde", icon: Sunset },
+  { value: "noite", label: "Noite", icon: Moon },
+];
+
 const Agenda = () => {
-  const { visits, add, update, remove } = useAgenda();
+  const { visits, add, update, remove, ensureScheduled } = useAgenda();
   const { holidays, add: addHoliday, remove: removeHoliday, isHoliday } = useHolidays();
+  const { overrides } = useCycleConfig();
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
 
   const [selectedDate, setSelectedDate] = useState(todayISO());
+  const [selectedShift, setSelectedShift] = useState<VisitShift>("tarde");
   const [forceClient, setForceClient] = useState<string | null>(null);
   const [holidayDialog, setHolidayDialog] = useState(false);
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
 
-  // Pace base do mês
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
   const pace = computeDailyPace(salesperson.goalMonth, salesperson.achievedMonth, new Date(), holidaySet);
 
-  // Visitas do dia selecionado
   const dayVisits = visits
     .filter(v => v.date === selectedDate)
     .sort((a, b) => {
@@ -46,32 +62,29 @@ const Agenda = () => {
       return order[a.shift] - order[b.shift];
     });
 
-  // Sugestões para o dia (excluindo já agendadas)
   const suggestions = useMemo(
-    () => suggestionsForDate(selectedDate, visits).slice(0, 6),
-    [selectedDate, visits]
+    () => suggestionsForDate(selectedDate, visits, overrides).slice(0, 6),
+    [selectedDate, visits, overrides]
   );
 
-  // Simulação: somatório do projetado das visitas pendentes/concluídas do dia
   const dayProjected = dayVisits.reduce((s, v) => s + (v.realized ?? v.projected), 0);
   const dayRealized = dayVisits.filter(v => v.status === "concluida").reduce((s, v) => s + (v.realized ?? 0), 0);
 
-  // Considera realizado de hoje (do salesperson) + projeções das visitas futuras do dia
   const isToday = selectedDate === todayISO();
-  const realizedToday = isToday ? salesperson.achievedToday : 0;
+  const realizedToday = isToday
+    ? Math.max(salesperson.achievedToday, dayRealized)
+    : dayRealized;
   const projectedRest = dayVisits
-    .filter(v => v.status === "pendente")
+    .filter(v => v.status === "pendente" || v.status === "em_visita")
     .reduce((s, v) => s + v.projected, 0);
   const simulatedTotalToday = realizedToday + projectedRest;
   const dailyGoal = pace.dailyGoal;
   const simulatedPct = dailyGoal > 0 ? (simulatedTotalToday / dailyGoal) * 100 : 0;
 
-  // Alerta de risco
-  const expectedSoFar = dailyGoal; // alvo do dia
+  const expectedSoFar = dailyGoal;
   const actualPct = expectedSoFar > 0 ? (realizedToday / expectedSoFar) * 100 : 0;
   const isAtRisk = isToday && pace.isWorkdayToday && actualPct < 80;
 
-  // Próximas datas (7 dias)
   const next7 = useMemo(() => {
     const arr: string[] = [];
     const d = new Date();
@@ -83,22 +96,27 @@ const Agenda = () => {
     return arr;
   }, []);
 
-  const handleAddSuggestion = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
+  /** Agenda 1-toque: usa data + turno selecionados, sem duplicar. */
+  const quickSchedule = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
     const c = clientMap[clientId];
     if (!c) return;
-    add({
+    const { created } = ensureScheduled({
       clientId,
       date: selectedDate,
-      shift: "tarde",
+      shift: selectedShift,
       status: "pendente",
       origin,
       projected: c.avgTicket,
     });
+    flash(created
+      ? `${c.fantasy} agendado para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`
+      : `${c.fantasy} já estava na agenda deste dia`
+    );
   };
 
   const handleForceVisit = () => {
     if (!forceClient) return;
-    handleAddSuggestion(forceClient, "forcada");
+    quickSchedule(forceClient, "forcada");
     setForceClient(null);
   };
 
@@ -111,8 +129,18 @@ const Agenda = () => {
 
   const eligibleForce = clients.filter(c => c.status !== "bloqueado");
 
+  const ShiftIcon = (s: VisitShift) =>
+    s === "manha" ? Sun : s === "tarde" ? Sunset : Moon;
+
   return (
     <MobileShell title="Agenda" subtitle="Roteiro & meta diária">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background shadow-lg">
+          {toast}
+        </div>
+      )}
+
       {/* Alerta de risco */}
       {isAtRisk && (
         <section className="mb-4 rounded-2xl border border-warning/40 bg-warning-soft p-3 shadow-soft">
@@ -133,7 +161,7 @@ const Agenda = () => {
                   {suggestions.slice(0, 2).map(s => (
                     <button
                       key={s.client.id}
-                      onClick={() => handleAddSuggestion(s.client.id, "forcada")}
+                      onClick={() => quickSchedule(s.client.id, "forcada")}
                       className="flex w-full items-center justify-between gap-2 rounded-xl bg-card p-2 text-left shadow-soft active:scale-[0.99]"
                     >
                       <div className="min-w-0">
@@ -192,7 +220,7 @@ const Agenda = () => {
           <div
             className="h-full -mt-2.5 bg-primary/30"
             style={{
-              width: `${Math.min(100, simulatedPct) - Math.min(100, actualPct)}%`,
+              width: `${Math.max(0, Math.min(100, simulatedPct) - Math.min(100, actualPct))}%`,
               marginLeft: `${Math.min(100, actualPct)}%`,
             }}
           />
@@ -207,11 +235,6 @@ const Agenda = () => {
             <p className="font-bold text-primary num">+{formatBRL(projectedRest)}</p>
           </div>
         </div>
-        {dayVisits.filter(v => v.status === "pendente").length === 0 && isToday && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Adicione visitas abaixo para simular o atingimento.
-          </p>
-        )}
       </section>
 
       {/* Seletor de data */}
@@ -250,6 +273,35 @@ const Agenda = () => {
         </div>
       </section>
 
+      {/* Seletor de turno (usado pelo "agendar agora") */}
+      <section className="mb-3 flex items-center gap-1 rounded-2xl bg-card p-1 shadow-soft">
+        {SHIFT_OPTIONS.map(s => {
+          const Icon = s.icon;
+          const active = selectedShift === s.value;
+          const count = dayVisits.filter(v => v.shift === s.value).length;
+          return (
+            <button
+              key={s.value}
+              onClick={() => setSelectedShift(s.value)}
+              className={cn(
+                "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                active ? "bg-primary text-primary-foreground shadow-glow" : "text-muted-foreground"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {s.label}
+              {count > 0 && (
+                <span className={cn("rounded-full px-1.5 text-[10px] font-bold",
+                  active ? "bg-white/25" : "bg-muted"
+                )}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </section>
+
       {/* Visitas programadas do dia */}
       <section className="mb-4">
         <div className="mb-2 flex items-center justify-between">
@@ -273,23 +325,25 @@ const Agenda = () => {
             {dayVisits.map(v => {
               const c = clientMap[v.clientId];
               if (!c) return null;
-              const info = getCycleInfo(c);
+              const info = getCycleInfo(c, undefined, overrides);
+              const SIcon = ShiftIcon(v.shift);
               return (
                 <div
                   key={v.id}
                   className={cn(
                     "rounded-2xl bg-card p-3 shadow-soft",
-                    v.status === "concluida" && "opacity-70"
+                    v.status === "concluida" && "opacity-80",
+                    v.status === "em_visita" && "ring-2 ring-primary/40"
                   )}
                 >
                   <div className="flex items-start gap-3">
                     <span className={cn(
-                      "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-xs font-bold",
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
                       v.origin === "forcada" ? "bg-warning text-warning-foreground"
                       : v.origin === "sugestao_ciclo" ? "bg-accent/15 text-accent"
                       : "bg-primary/10 text-primary"
                     )}>
-                      {v.shift === "manha" ? "M" : v.shift === "tarde" ? "T" : "N"}
+                      <SIcon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <Link to={`/clientes/${c.id}`} className="block">
@@ -315,41 +369,34 @@ const Agenda = () => {
                           </span>
                         )}
                         <span className="text-[11px] text-muted-foreground num">
-                          {v.realized
-                            ? `R$ ${(v.realized).toFixed(0)} realizado`
+                          {v.realized != null
+                            ? `${formatBRL(v.realized)} realizado`
                             : `proj. ${formatBRL(v.projected)}`}
                         </span>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      {v.status === "pendente" ? (
-                        <button
-                          onClick={() => update(v.id, { status: "concluida", realized: v.projected })}
-                          className="grid h-8 w-8 place-items-center rounded-lg bg-success-soft text-success transition active:scale-95"
-                          aria-label="Concluir visita"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-success text-success-foreground">
-                          <Check className="h-4 w-4" />
-                        </span>
-                      )}
-                      <button
-                        onClick={() => remove(v.id)}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
-                        aria-label="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => remove(v.id)}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
+                      aria-label="Remover"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
+                  <CheckInOut visit={v} />
                 </div>
               );
             })}
           </div>
         )}
       </section>
+
+      {/* Roteiro otimizado */}
+      {isToday && (
+        <section className="mb-4">
+          <RouteSuggestion visits={dayVisits} />
+        </section>
+      )}
 
       {/* Visita não programada (forçada) */}
       <section className="mb-4 rounded-2xl border border-warning/30 bg-warning-soft/40 p-3">
@@ -392,10 +439,9 @@ const Agenda = () => {
         ) : (
           <div className="space-y-2">
             {suggestions.map(({ client, info }) => (
-              <button
+              <div
                 key={client.id}
-                onClick={() => handleAddSuggestion(client.id)}
-                className="flex w-full items-center gap-3 rounded-2xl bg-card p-3 text-left shadow-soft transition active:scale-[0.99]"
+                className="flex w-full items-center gap-3 rounded-2xl bg-card p-3 shadow-soft"
               >
                 <span className={cn(
                   "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
@@ -419,13 +465,23 @@ const Agenda = () => {
                     Ticket {formatBRL(client.avgTicket)} · {client.segment}
                   </p>
                 </div>
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-                  <Plus className="h-4 w-4" />
-                </span>
-              </button>
+                <button
+                  onClick={() => quickSchedule(client.id)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition active:scale-95"
+                  aria-label={`Agendar ${client.fantasy} agora`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agendar
+                </button>
+              </div>
             ))}
           </div>
         )}
+      </section>
+
+      {/* Editor do ciclo por segmento */}
+      <section className="mb-4">
+        <CycleEditor />
       </section>
 
       {/* Cadastro de feriados */}
@@ -479,7 +535,7 @@ const Agenda = () => {
                 className="flex-1"
               />
               <Input
-                placeholder="Descrição (ex.: Aniversário cidade)"
+                placeholder="Descrição"
                 value={newHolidayLabel}
                 onChange={(e) => setNewHolidayLabel(e.target.value)}
                 className="flex-1"

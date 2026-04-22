@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
-import { clients, formatBRL, formatPct } from "@/lib/mock";
+import { DailyGoalCard } from "@/components/DailyGoalCard";
+import { clients, formatBRL, formatPct, salesperson } from "@/lib/mock";
 import { Trophy, Users, TrendingDown, UserCircle2, UsersRound, Building2 } from "lucide-react";
 import { useProfile, ROLE_LABEL } from "@/lib/profile";
 import { cn } from "@/lib/utils";
@@ -212,7 +213,7 @@ const Painel = () => {
 
       <section className="mt-3 rounded-2xl bg-card p-3 shadow-soft">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Atingimento da meta</span>
+          <span className="text-muted-foreground">Atingimento da meta mensal</span>
           <span className="font-bold num">{kpis.goalPct.toFixed(0)}%</span>
         </div>
         <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
@@ -224,6 +225,15 @@ const Painel = () => {
           />
         </div>
       </section>
+
+      {/* === Meta diária por dias úteis === */}
+      <div className="mt-3">
+        <DailyGoalCard
+          monthlyGoal={kpis.goal}
+          achievedMonth={kpis.sold}
+          achievedToday={role === "vendedor" ? salesperson.achievedToday : Math.round(kpis.sold * 0.05)}
+        />
+      </div>
 
       {/* === Ranking de vendedores (supervisor + gerente) === */}
       {role !== "vendedor" && ranking.length > 0 && (

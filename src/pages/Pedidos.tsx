@@ -169,52 +169,57 @@ const Pedidos = () => {
         </div>
       )}
 
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {STATUS_FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-              filter === f.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
-            )}
-          >
-            {f.id === "live" && <Radio className="mr-1 inline h-3 w-3" />}
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {!q && (
+        <>
+          {/* Filtros */}
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                  filter === f.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                )}
+              >
+                {f.id === "live" && <Radio className="mr-1 inline h-3 w-3" />}
+                {f.label}
+              </button>
+            ))}
+          </div>
 
-      {filtered.length === 0 && (
-        <div className="rounded-2xl bg-card p-8 text-center shadow-soft">
-          <p className="text-sm text-muted-foreground">Nenhum pedido neste filtro.</p>
-        </div>
-      )}
+          {filtered.length === 0 && (
+            <div className="rounded-2xl bg-card p-8 text-center shadow-soft">
+              <p className="text-sm text-muted-foreground">Nenhum pedido neste filtro.</p>
+            </div>
+          )}
 
-      {/* Lista */}
-      {role === "vendedor" ? (
-        <div className="space-y-2">
-          {filtered.map(o => <OrderTracking key={o.id} order={o} compact />)}
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {Array.from(grouped!.entries()).map(([repId, list]) => {
-            const rep = reps.find(r => r.id === repId);
-            return (
-              <section key={repId}>
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    {rep?.name || repId} <span className="text-foreground/60">· {rep?.region}</span>
-                  </h3>
-                  <span className="text-[10px] text-muted-foreground">{list.length} pedido(s)</span>
-                </div>
-                <div className="space-y-2">
-                  {list.map(o => <OrderTracking key={o.id} order={o} compact />)}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+          {/* Lista */}
+          {role === "vendedor" ? (
+            <div className="space-y-2">
+              {filtered.map(o => <OrderTracking key={o.id} order={o} compact />)}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {Array.from(grouped!.entries()).map(([repId, list]) => {
+                const rep = reps.find(r => r.id === repId);
+                return (
+                  <section key={repId}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                        {rep?.name || repId} <span className="text-foreground/60">· {rep?.region}</span>
+                      </h3>
+                      <span className="text-[10px] text-muted-foreground">{list.length} pedido(s)</span>
+                    </div>
+                    <div className="space-y-2">
+                      {list.map(o => <OrderTracking key={o.id} order={o} compact />)}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </MobileShell>
   );

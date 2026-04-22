@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X, Truck, Radio } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
+import { DailyGoalCard } from "@/components/DailyGoalCard";
 import { clients, formatBRL, formatPct, products, salesperson, smartAlerts } from "@/lib/mock";
 import { useDraft } from "@/lib/draft";
 import { computeTotals } from "@/lib/calc";
@@ -11,7 +12,6 @@ import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/track
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
 const Index = () => {
-  const goalPct = Math.min(100, (salesperson.achievedMonth / salesperson.goalMonth) * 100);
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
   const topAlerts = smartAlerts.slice(0, 3);
   const { draft, hasDraft, clearDraft } = useDraft();
@@ -32,17 +32,13 @@ const Index = () => {
       subtitle="Resumo de hoje"
       title={`${formatBRL(salesperson.achievedToday)}`}
       rightSlot={
-        <div className="mt-4 rounded-2xl bg-white/10 p-3 backdrop-blur">
-          <div className="flex items-center justify-between text-xs">
-            <span className="opacity-90 inline-flex items-center gap-1.5">
-              <Trophy className="h-3.5 w-3.5" /> Meta do mês
-            </span>
-            <span className="font-semibold num">{formatBRL(salesperson.achievedMonth)} / {formatBRL(salesperson.goalMonth)}</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
-            <div className="h-full rounded-full bg-gradient-to-r from-accent to-white/90 transition-all" style={{ width: `${goalPct}%` }} />
-          </div>
-          <p className="mt-1.5 text-[11px] opacity-80">{goalPct.toFixed(0)}% atingido — faltam {formatBRL(salesperson.goalMonth - salesperson.achievedMonth)}</p>
+        <div className="mt-4">
+          <DailyGoalCard
+            monthlyGoal={salesperson.goalMonth}
+            achievedMonth={salesperson.achievedMonth}
+            achievedToday={salesperson.achievedToday}
+            compact
+          />
         </div>
       }
     >

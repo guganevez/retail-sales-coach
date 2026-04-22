@@ -96,6 +96,30 @@ const Index = () => {
         <ArrowRight className="h-6 w-6" />
       </Link>
 
+      {/* Pedidos em rastreio ao vivo */}
+      {liveOrders.length > 0 && (
+        <Link
+          to="/pedidos"
+          className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft transition active:scale-[0.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Truck className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+              <Radio className="h-3 w-3 animate-pulse-soft" /> Pedidos ao vivo
+            </p>
+            <p className="text-sm font-semibold">{liveOrders.length} pedido(s) em andamento</p>
+            <p className="text-[11px] text-muted-foreground">
+              {liveOrders.filter(o => o.status === "em_rota").length} em rota ·{" "}
+              {liveOrders.filter(o => o.status === "carga").length} em carga ·{" "}
+              {liveOrders.filter(o => o.status === "separacao").length} em separação
+            </p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+      )}
+
       {/* Alerts */}
       <section className="mt-6">
         <div className="mb-2 flex items-center justify-between">

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { DailyGoalCard } from "@/components/DailyGoalCard";
+import { AdvancedKpis } from "@/components/AdvancedKpis";
 import { clients, formatBRL, formatPct, salesperson } from "@/lib/mock";
 import { Trophy, Users, TrendingDown, UserCircle2, UsersRound, Building2 } from "lucide-react";
 import { useProfile, ROLE_LABEL } from "@/lib/profile";
@@ -238,6 +239,13 @@ const Painel = () => {
           holidays={holidaySet}
         />
       </div>
+
+      {/* === KPIs avançados por papel === */}
+      <AdvancedKpis
+        role={role}
+        scopeId={role === "vendedor" ? profile.id : role === "supervisor" ? profile.id : null}
+        selectedSupervisorId={selectedSupervisorId}
+      />
 
       {/* === Ranking de vendedores (supervisor + gerente) === */}
       {role !== "vendedor" && ranking.length > 0 && (

@@ -5,33 +5,40 @@ import { clients } from "./mock";
 import { getCycleInfo, suggestionScore } from "./cycle";
 import { Client } from "./types";
 
-const STORAGE_KEY = "negri.agenda.v1";
+const STORAGE_KEY = "negri.agenda.v2"; // bump por novos campos check-in
 
-export type VisitStatus = "pendente" | "concluida" | "remarcada";
+export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada";
 export type VisitOrigin = "programada" | "sugestao_ciclo" | "forcada";
+export type VisitShift = "manha" | "tarde" | "noite";
+
+export interface CheckPoint {
+  at: string;         // ISO timestamp
+  geo?: { lat: number; lng: number } | null;
+  geoError?: string;
+}
 
 export interface Visit {
   id: string;
   clientId: string;
-  /** ISO YYYY-MM-DD */
-  date: string;
-  /** "manha" | "tarde" | "noite" */
-  shift: "manha" | "tarde" | "noite";
+  date: string;             // ISO YYYY-MM-DD
+  shift: VisitShift;
   status: VisitStatus;
   origin: VisitOrigin;
   notes?: string;
-  /** valor projetado de venda (= ticket médio) */
   projected: number;
-  /** valor realizado (preenchido manualmente quando concluída) */
   realized?: number;
+  checkIn?: CheckPoint;
+  checkOut?: CheckPoint;
 }
 
 interface AgendaCtx {
   visits: Visit[];
-  add: (v: Omit<Visit, "id">) => void;
+  add: (v: Omit<Visit, "id">) => Visit;
   update: (id: string, patch: Partial<Visit>) => void;
   remove: (id: string) => void;
-  forVendedor: (repId: string) => Visit[]; // por enquanto retorna tudo (mock single-user)
+  forVendedor: (repId: string) => Visit[];
+  /** Cria visita só se ainda não existe para o mesmo cliente+data. Retorna a existente ou criada. */
+  ensureScheduled: (input: Omit<Visit, "id">) => { visit: Visit; created: boolean };
 }
 
 const Ctx = createContext<AgendaCtx | null>(null);
@@ -42,12 +49,10 @@ const todayISO = () => {
 };
 
 const seed = (): Visit[] => {
-  // Semente determinística: pré-agenda 3 visitas para hoje p/ demonstração.
   const today = todayISO();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const t = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-
   return [
     { id: "vt1", clientId: "c1", date: today, shift: "manha", status: "concluida", origin: "programada", projected: 2840, realized: 3120 },
     { id: "vt2", clientId: "c2", date: today, shift: "tarde", status: "pendente", origin: "programada", projected: 5120 },
@@ -61,26 +66,31 @@ export function AgendaProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw) as Visit[];
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     return seed();
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
-    } catch {
-      // ignore
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(visits)); } catch { /* ignore */ }
   }, [visits]);
 
   const value = useMemo<AgendaCtx>(() => ({
     visits,
-    add: (v) => setVisits((prev) => [...prev, { ...v, id: `vt${Date.now()}` }]),
+    add: (v) => {
+      const nv: Visit = { ...v, id: `vt${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
+      setVisits((prev) => [...prev, nv]);
+      return nv;
+    },
     update: (id, patch) => setVisits((prev) => prev.map(v => v.id === id ? { ...v, ...patch } : v)),
     remove: (id) => setVisits((prev) => prev.filter(v => v.id !== id)),
     forVendedor: () => visits,
+    ensureScheduled: (input) => {
+      const existing = visits.find(v => v.clientId === input.clientId && v.date === input.date);
+      if (existing) return { visit: existing, created: false };
+      const nv: Visit = { ...input, id: `vt${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
+      setVisits((prev) => [...prev, nv]);
+      return { visit: nv, created: true };
+    },
   }), [visits]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -93,12 +103,16 @@ export function useAgenda() {
 }
 
 /** Sugestões de visita por ciclo, excluindo clientes já agendados para uma data. */
-export function suggestionsForDate(dateISO: string, alreadyScheduled: Visit[]): Array<{ client: Client; info: ReturnType<typeof getCycleInfo>; score: number }> {
+export function suggestionsForDate(
+  dateISO: string,
+  alreadyScheduled: Visit[],
+  segmentOverrides?: Record<string, number>,
+): Array<{ client: Client; info: ReturnType<typeof getCycleInfo>; score: number }> {
   const usedIds = new Set(alreadyScheduled.filter(v => v.date === dateISO).map(v => v.clientId));
   return clients
     .filter(c => c.status !== "bloqueado" && !usedIds.has(c.id))
     .map(c => {
-      const info = getCycleInfo(c);
+      const info = getCycleInfo(c, undefined, segmentOverrides);
       return { client: c, info, score: suggestionScore(info) };
     })
     .filter(x => x.score > 0)

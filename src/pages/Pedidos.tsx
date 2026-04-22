@@ -25,6 +25,7 @@ const STATUS_FILTERS: { id: TrackingStatus | "todos" | "live"; label: string }[]
 const Pedidos = () => {
   const { role, profile } = useProfile();
   const [filter, setFilter] = useState<TrackingStatus | "todos" | "live">("live");
+  const [query, setQuery] = useState("");
 
   const orders: TrackedOrder[] = useMemo(() => {
     if (role === "vendedor") return ordersForRep(profile.id);
@@ -32,11 +33,36 @@ const Pedidos = () => {
     return ordersForManager();
   }, [role, profile.id]);
 
+  // Lista única de clientes (com contagem) — base do atalho de busca
+  const clientList = useMemo(() => {
+    const map = new Map<string, { id: string; fantasy: string; city: string; orders: TrackedOrder[] }>();
+    orders.forEach(o => {
+      const c = map.get(o.clientId) || { id: o.clientId, fantasy: o.clientFantasy, city: o.city, orders: [] };
+      c.orders.push(o);
+      map.set(o.clientId, c);
+    });
+    return Array.from(map.values()).sort((a, b) => a.fantasy.localeCompare(b.fantasy));
+  }, [orders]);
+
+  // Match de busca por cliente (nome ou cidade)
+  const q = query.trim().toLowerCase();
+  const matchedClients = q
+    ? clientList.filter(c =>
+        c.fantasy.toLowerCase().includes(q) || c.city.toLowerCase().includes(q),
+      )
+    : [];
+
   const filtered = useMemo(() => {
-    if (filter === "todos") return orders;
-    if (filter === "live") return orders.filter(o => ["separacao","carga","em_rota"].includes(o.status));
-    return orders.filter(o => o.status === filter);
-  }, [orders, filter]);
+    let base = orders;
+    if (q) {
+      base = base.filter(o =>
+        o.clientFantasy.toLowerCase().includes(q) || o.city.toLowerCase().includes(q),
+      );
+    }
+    if (filter === "todos") return base;
+    if (filter === "live") return base.filter(o => ["separacao","carga","em_rota"].includes(o.status));
+    return base.filter(o => o.status === filter);
+  }, [orders, filter, q]);
 
   const liveCount = orders.filter(o => ["separacao","carga","em_rota"].includes(o.status)).length;
 

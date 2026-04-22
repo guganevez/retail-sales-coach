@@ -82,6 +82,28 @@ const Index = () => {
         </div>
       }
     >
+      {/* Alerta de risco de meta */}
+      {isAtRisk && role === "vendedor" && (
+        <Link
+          to="/agenda"
+          className="mb-3 flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning-soft p-3 shadow-soft transition active:scale-[0.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning text-warning-foreground">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-warning">Risco de meta diária</p>
+            <p className="text-sm font-semibold text-foreground">
+              {todayPctActual.toFixed(0)}% do esperado · faltam {formatBRL(Math.max(0, pace.dailyGoal - salesperson.achievedToday))}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Toque para ver sugestões priorizadas na Agenda.
+            </p>
+          </div>
+          <Zap className="h-5 w-5 text-warning" />
+        </Link>
+      )}
+
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-3">
         <StatCard label="Semana" value={formatBRL(salesperson.achievedWeek)} hint="+12% vs anterior" />
@@ -89,6 +111,28 @@ const Index = () => {
         <StatCard label="Margem média" value={formatPct(salesperson.avgMargin)} tone={salesperson.avgMargin >= 8 ? "success" : "warning"} hint="Saudável" />
         <StatCard label="Pedidos hoje" value="4" hint="Ticket médio R$ 2.467" />
       </section>
+
+      {/* Atalho Agenda */}
+      <Link
+        to="/agenda"
+        className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft transition active:scale-[0.99]"
+      >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent">
+          <CalendarDays className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-accent">Agenda do dia</p>
+          <p className="text-sm font-semibold">
+            {todaysVisits.length === 0
+              ? "Nenhuma visita programada"
+              : `${todaysVisits.filter(v => v.status === "pendente").length} pendentes · ${todaysVisits.filter(v => v.status === "concluida").length} concluídas`}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {pace.elapsedWorkdays}/{pace.totalWorkdays} dias úteis · meta {formatBRL(pace.dailyGoal)}/dia
+          </p>
+        </div>
+        <ArrowRight className="h-5 w-5 text-muted-foreground" />
+      </Link>
 
       {/* Continuar rascunho */}
       {hasDraft && draft && (

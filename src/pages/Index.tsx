@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, Trophy, FileEdit, X, Truck, Radio } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { clients, formatBRL, formatPct, products, salesperson, smartAlerts } from "@/lib/mock";
 import { useDraft } from "@/lib/draft";
 import { computeTotals } from "@/lib/calc";
+import { useProfile } from "@/lib/profile";
+import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/tracking";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
@@ -13,8 +15,17 @@ const Index = () => {
   const inactives = clients.filter(c => c.lastPurchaseDays > 30 && c.status !== "potencial");
   const topAlerts = smartAlerts.slice(0, 3);
   const { draft, hasDraft, clearDraft } = useDraft();
+  const { role, profile } = useProfile();
   const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
   const draftTotals = draft ? computeTotals(draft.items, productMap) : null;
+
+  // Pedidos em rastreio (filtrados por papel)
+  const allTracked = role === "vendedor"
+    ? ordersForRep(profile.id)
+    : role === "supervisor"
+      ? ordersForSupervisor(profile.id)
+      : ordersForManager();
+  const liveOrders = allTracked.filter(o => ["separacao","carga","em_rota"].includes(o.status));
 
   return (
     <MobileShell

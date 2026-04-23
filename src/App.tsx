@@ -35,7 +35,8 @@ const App = () => (
             <AgendaProvider>
               <QuotesProvider>
                 <DraftProvider>
-                  <BrowserRouter>
+                  <DailyGoalViewProvider>
+                    <BrowserRouter>
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/clientes" element={<Clientes />} />

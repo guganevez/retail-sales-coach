@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Plus, Clock, AlertTriangle, Sparkles, Trash2,
   CalendarPlus, Zap, TrendingDown, X, Target, MapPin, Sun, Moon, Sunset, Check,
+  CalendarClock,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { useAgenda, suggestionsForDate, todayISO, Visit, VisitShift } from "@/lib/agenda";
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { CheckInOut } from "@/components/CheckInOut";
 import { CycleEditor } from "@/components/CycleEditor";
 import { RouteSuggestion } from "@/components/RouteSuggestion";
+import { ScheduleDialog } from "@/components/ScheduleDialog";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -47,6 +49,16 @@ const Agenda = () => {
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  // Diálogo de agendar/reagendar com data + turno customizados
+  const [scheduleDialog, setScheduleDialog] = useState<{
+    mode: "create" | "reschedule";
+    clientId: string;
+    visitId?: string;          // só em reschedule
+    origin?: Visit["origin"];  // só em create
+    date: string;
+    shift: VisitShift;
+  } | null>(null);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -96,27 +108,91 @@ const Agenda = () => {
     return arr;
   }, []);
 
-  /** Agenda 1-toque: usa data + turno selecionados, sem duplicar. */
-  const quickSchedule = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
+  /** Agenda 1-toque: usa data + turno selecionados (ou customizados), sem duplicar. */
+  const quickSchedule = (
+    clientId: string,
+    origin: Visit["origin"] = "sugestao_ciclo",
+    overrideDate?: string,
+    overrideShift?: VisitShift,
+  ) => {
     const c = clientMap[clientId];
     if (!c) return;
+    const date = overrideDate ?? selectedDate;
+    const shift = overrideShift ?? selectedShift;
     const { created } = ensureScheduled({
       clientId,
-      date: selectedDate,
-      shift: selectedShift,
+      date,
+      shift,
       status: "pendente",
       origin,
       projected: c.avgTicket,
     });
     flash(created
-      ? `${c.fantasy} agendado para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`
+      ? `${c.fantasy} agendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`
       : `${c.fantasy} já estava na agenda deste dia`
     );
+    if (overrideDate && overrideDate !== selectedDate) {
+      // Salta para o dia agendado para feedback visual
+      setSelectedDate(overrideDate);
+    }
+  };
+
+  /** Abre o diálogo para escolher data/turno antes de agendar */
+  const openScheduleDialog = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
+    setScheduleDialog({
+      mode: "create",
+      clientId,
+      origin,
+      date: selectedDate,
+      shift: selectedShift,
+    });
+  };
+
+  /** Abre o diálogo para reagendar uma visita existente */
+  const openRescheduleDialog = (v: Visit) => {
+    setScheduleDialog({
+      mode: "reschedule",
+      clientId: v.clientId,
+      visitId: v.id,
+      date: v.date,
+      shift: v.shift,
+    });
+  };
+
+  /** Confirma o agendamento (cria ou reagenda) */
+  const handleScheduleConfirm = (date: string, shift: VisitShift) => {
+    if (!scheduleDialog) return;
+    const c = clientMap[scheduleDialog.clientId];
+    if (!c) return;
+
+    if (scheduleDialog.mode === "reschedule" && scheduleDialog.visitId) {
+      // Verifica conflito: outra visita do mesmo cliente já existe naquele dia?
+      const conflict = visits.find(
+        v => v.id !== scheduleDialog.visitId
+          && v.clientId === scheduleDialog.clientId
+          && v.date === date
+      );
+      if (conflict) {
+        flash(`${c.fantasy} já tem visita em ${formatDateLabel(date).split(" · ")[1]}`);
+        return;
+      }
+      update(scheduleDialog.visitId, { date, shift, status: "pendente" });
+      flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
+      setSelectedDate(date);
+    } else {
+      quickSchedule(scheduleDialog.clientId, scheduleDialog.origin ?? "sugestao_ciclo", date, shift);
+    }
   };
 
   const handleForceVisit = () => {
     if (!forceClient) return;
     quickSchedule(forceClient, "forcada");
+    setForceClient(null);
+  };
+
+  const handleForceVisitWithDate = () => {
+    if (!forceClient) return;
+    openScheduleDialog(forceClient, "forcada");
     setForceClient(null);
   };
 
@@ -375,13 +451,25 @@ const Agenda = () => {
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => remove(v.id)}
-                      className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
-                      aria-label="Remover"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      {v.status !== "concluida" && (
+                        <button
+                          onClick={() => openRescheduleDialog(v)}
+                          className="grid h-8 w-8 place-items-center rounded-lg text-primary transition active:scale-95 hover:bg-primary/10"
+                          aria-label="Reagendar"
+                          title="Reagendar"
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => remove(v.id)}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
+                        aria-label="Remover"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <CheckInOut visit={v} />
                 </div>
@@ -419,9 +507,18 @@ const Agenda = () => {
             onClick={handleForceVisit}
             disabled={!forceClient}
             className="rounded-xl bg-warning px-3 py-2 text-xs font-bold text-warning-foreground disabled:opacity-50"
+            title={`Adicionar para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`}
           >
             <CalendarPlus className="mr-1 inline h-4 w-4" />
             Adicionar
+          </button>
+          <button
+            onClick={handleForceVisitWithDate}
+            disabled={!forceClient}
+            className="rounded-xl border border-warning bg-card px-3 py-2 text-xs font-bold text-warning disabled:opacity-50"
+            title="Escolher outra data e turno"
+          >
+            <CalendarClock className="h-4 w-4" />
           </button>
         </div>
       </section>
@@ -465,14 +562,26 @@ const Agenda = () => {
                     Ticket {formatBRL(client.avgTicket)} · {client.segment}
                   </p>
                 </div>
-                <button
-                  onClick={() => quickSchedule(client.id)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition active:scale-95"
-                  aria-label={`Agendar ${client.fantasy} agora`}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Agendar
-                </button>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button
+                    onClick={() => quickSchedule(client.id)}
+                    className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition active:scale-95"
+                    aria-label={`Agendar ${client.fantasy} para ${formatDateLabel(selectedDate).split(" · ")[1]}`}
+                    title={`Agendar para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agendar
+                  </button>
+                  <button
+                    onClick={() => openScheduleDialog(client.id)}
+                    className="inline-flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-card px-3 py-1.5 text-[11px] font-semibold text-primary transition active:scale-95 hover:bg-primary/5"
+                    aria-label={`Escolher data para ${client.fantasy}`}
+                    title="Escolher outra data"
+                  >
+                    <CalendarClock className="h-3 w-3" />
+                    Outra data
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -576,6 +685,24 @@ const Agenda = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {scheduleDialog && (
+        <ScheduleDialog
+          open={!!scheduleDialog}
+          onOpenChange={(o) => { if (!o) setScheduleDialog(null); }}
+          title={scheduleDialog.mode === "reschedule" ? "Reagendar visita" : "Agendar visita"}
+          description={
+            scheduleDialog.mode === "reschedule"
+              ? "Escolha uma nova data e turno. A visita atual será movida."
+              : "Escolha quando essa visita deve acontecer."
+          }
+          clientName={clientMap[scheduleDialog.clientId]?.fantasy}
+          defaultDate={scheduleDialog.date}
+          defaultShift={scheduleDialog.shift}
+          confirmLabel={scheduleDialog.mode === "reschedule" ? "Reagendar" : "Agendar"}
+          onConfirm={handleScheduleConfirm}
+        />
+      )}
     </MobileShell>
   );
 };

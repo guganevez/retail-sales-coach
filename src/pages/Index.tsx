@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio, CalendarDays, Zap } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio, CalendarDays, Zap, Eye } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { DailyGoalCard, RealizedSource } from "@/components/DailyGoalCard";
@@ -12,6 +12,7 @@ import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/track
 import { useHolidays } from "@/lib/holidays";
 import { useAgenda, todayISO } from "@/lib/agenda";
 import { computeDailyPace } from "@/lib/workdays";
+import { useDailyGoalView } from "@/lib/dailyGoalView";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));

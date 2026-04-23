@@ -1,7 +1,11 @@
-import { CalendarDays, TrendingUp, TrendingDown, Target, MapPin } from "lucide-react";
+import { CalendarDays, TrendingUp, TrendingDown, Target, MapPin, ChevronDown, ChevronUp, EyeOff, Eye } from "lucide-react";
+import { useEffect, useState } from "react";
 import { computeDailyPace, HolidaySet } from "@/lib/workdays";
 import { formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+
+type CompactMode = "full" | "mini" | "hidden";
+const STORAGE_KEY = "negri.dailyGoal.compactMode.v1";
 
 export interface RealizedSource {
   /** rótulo (cliente/rota) */

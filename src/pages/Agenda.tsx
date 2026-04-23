@@ -685,6 +685,24 @@ const Agenda = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {scheduleDialog && (
+        <ScheduleDialog
+          open={!!scheduleDialog}
+          onOpenChange={(o) => { if (!o) setScheduleDialog(null); }}
+          title={scheduleDialog.mode === "reschedule" ? "Reagendar visita" : "Agendar visita"}
+          description={
+            scheduleDialog.mode === "reschedule"
+              ? "Escolha uma nova data e turno. A visita atual será movida."
+              : "Escolha quando essa visita deve acontecer."
+          }
+          clientName={clientMap[scheduleDialog.clientId]?.fantasy}
+          defaultDate={scheduleDialog.date}
+          defaultShift={scheduleDialog.shift}
+          confirmLabel={scheduleDialog.mode === "reschedule" ? "Reagendar" : "Agendar"}
+          onConfirm={handleScheduleConfirm}
+        />
+      )}
     </MobileShell>
   );
 };

@@ -44,16 +44,103 @@ export function DailyGoalCard({
   const sourcesTotal = (sources ?? []).reduce((s, x) => s + x.value, 0);
   const showSources = !!sources && sources.length > 0 && sourcesTotal > 0;
 
+  const [mode, setMode] = useState<CompactMode>("full");
+
+  useEffect(() => {
+    if (!compact) return;
+    try {
+      const v = localStorage.getItem(STORAGE_KEY) as CompactMode | null;
+      if (v === "full" || v === "mini" || v === "hidden") setMode(v);
+    } catch { /* ignore */ }
+  }, [compact]);
+
+  const persistMode = (m: CompactMode) => {
+    setMode(m);
+    try { localStorage.setItem(STORAGE_KEY, m); } catch { /* ignore */ }
+  };
+
   if (compact) {
+    if (mode === "hidden") {
+      return (
+        <button
+          onClick={() => persistMode("full")}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition hover:bg-white/15"
+          aria-label="Mostrar meta diária"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Mostrar meta diária ({todayPct.toFixed(0)}%)
+        </button>
+      );
+    }
+
+    if (mode === "mini") {
+      return (
+        <div className="rounded-2xl bg-white/10 p-2.5 backdrop-blur">
+          <div className="flex items-center gap-2">
+            <Target className="h-3.5 w-3.5 shrink-0 opacity-90" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="opacity-90">Meta diária</span>
+                <span className="num font-semibold">
+                  {formatBRL(achievedToday)} / {formatBRL(pace.dailyGoal)} ({todayPct.toFixed(0)}%)
+                </span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    todayPct >= 100 ? "bg-success" : todayPct >= 60 ? "bg-accent" : "bg-warning"
+                  )}
+                  style={{ width: `${Math.min(100, todayPct)}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                onClick={() => persistMode("full")}
+                className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                aria-label="Expandir meta diária"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => persistMode("hidden")}
+                className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                aria-label="Ocultar meta diária"
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
         <div className="flex items-center justify-between text-xs">
           <span className="opacity-90 inline-flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5" /> Meta diária ({pace.elapsedWorkdays}/{pace.totalWorkdays} dias úteis)
           </span>
-          <span className="font-semibold num">
-            {formatBRL(achievedToday)} / {formatBRL(pace.dailyGoal)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold num">
+              {formatBRL(achievedToday)} / {formatBRL(pace.dailyGoal)}
+            </span>
+            <button
+              onClick={() => persistMode("mini")}
+              className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+              aria-label="Reduzir meta diária"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => persistMode("hidden")}
+              className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+              aria-label="Ocultar meta diária"
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
           <div

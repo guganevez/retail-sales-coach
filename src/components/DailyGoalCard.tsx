@@ -1,11 +1,8 @@
-import { CalendarDays, TrendingUp, TrendingDown, Target, MapPin, ChevronDown, ChevronUp, EyeOff, Eye } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarDays, TrendingUp, TrendingDown, Target, MapPin, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
 import { computeDailyPace, HolidaySet } from "@/lib/workdays";
 import { formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
-
-type CompactMode = "full" | "mini" | "hidden";
-const STORAGE_KEY = "negri.dailyGoal.compactMode.v1";
+import { useDailyGoalView } from "@/lib/dailyGoalView";
 
 export interface RealizedSource {
   /** rótulo (cliente/rota) */
@@ -26,6 +23,8 @@ interface DailyGoalCardProps {
   holidays?: HolidaySet;
   /** Quebra do realizado de hoje por cliente/rota */
   sources?: RealizedSource[];
+  /** Rótulo do "resumo de hoje" exibido em destaque (modo compact). Ex.: "Resumo de hoje" */
+  todayLabel?: string;
 }
 
 export function DailyGoalCard({
@@ -35,6 +34,7 @@ export function DailyGoalCard({
   compact = false,
   holidays,
   sources,
+  todayLabel,
 }: DailyGoalCardProps) {
   const pace = computeDailyPace(monthlyGoal, achievedMonth, new Date(), holidays);
   const todayPct = pace.dailyGoal > 0 ? (achievedToday / pace.dailyGoal) * 100 : 0;
@@ -44,34 +44,11 @@ export function DailyGoalCard({
   const sourcesTotal = (sources ?? []).reduce((s, x) => s + x.value, 0);
   const showSources = !!sources && sources.length > 0 && sourcesTotal > 0;
 
-  const [mode, setMode] = useState<CompactMode>("full");
-
-  useEffect(() => {
-    if (!compact) return;
-    try {
-      const v = localStorage.getItem(STORAGE_KEY) as CompactMode | null;
-      if (v === "full" || v === "mini" || v === "hidden") setMode(v);
-    } catch { /* ignore */ }
-  }, [compact]);
-
-  const persistMode = (m: CompactMode) => {
-    setMode(m);
-    try { localStorage.setItem(STORAGE_KEY, m); } catch { /* ignore */ }
-  };
+  const { mode, setMode } = useDailyGoalView();
 
   if (compact) {
-    if (mode === "hidden") {
-      return (
-        <button
-          onClick={() => persistMode("full")}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition hover:bg-white/15"
-          aria-label="Mostrar meta diária"
-        >
-          <Eye className="h-3.5 w-3.5" />
-          Mostrar meta diária ({todayPct.toFixed(0)}%)
-        </button>
-      );
-    }
+    // O modo "hidden" é tratado pelo container (Index) — esconde tudo, inclusive resumo.
+    if (mode === "hidden") return null;
 
     if (mode === "mini") {
       return (
@@ -80,7 +57,9 @@ export function DailyGoalCard({
             <Target className="h-3.5 w-3.5 shrink-0 opacity-90" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="opacity-90">Meta diária</span>
+                <span className="opacity-90 truncate">
+                  {todayLabel ? `${todayLabel} · ` : ""}Meta diária
+                </span>
                 <span className="num font-semibold">
                   {formatBRL(achievedToday)} / {formatBRL(pace.dailyGoal)} ({todayPct.toFixed(0)}%)
                 </span>
@@ -97,16 +76,16 @@ export function DailyGoalCard({
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <button
-                onClick={() => persistMode("full")}
+                onClick={() => setMode("full")}
                 className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
-                aria-label="Expandir meta diária"
+                aria-label="Expandir"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => persistMode("hidden")}
+                onClick={() => setMode("hidden")}
                 className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
-                aria-label="Ocultar meta diária"
+                aria-label="Ocultar resumo e meta"
               >
                 <EyeOff className="h-3.5 w-3.5" />
               </button>
@@ -118,6 +97,30 @@ export function DailyGoalCard({
 
     return (
       <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
+        {todayLabel && (
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wide opacity-75">{todayLabel}</p>
+              <p className="text-2xl font-bold num leading-tight">{formatBRL(achievedToday)}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                onClick={() => setMode("mini")}
+                className="grid h-7 w-7 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                aria-label="Reduzir"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setMode("hidden")}
+                className="grid h-7 w-7 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                aria-label="Ocultar resumo e meta"
+              >
+                <EyeOff className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between text-xs">
           <span className="opacity-90 inline-flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5" /> Meta diária ({pace.elapsedWorkdays}/{pace.totalWorkdays} dias úteis)
@@ -126,20 +129,24 @@ export function DailyGoalCard({
             <span className="font-semibold num">
               {formatBRL(achievedToday)} / {formatBRL(pace.dailyGoal)}
             </span>
-            <button
-              onClick={() => persistMode("mini")}
-              className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
-              aria-label="Reduzir meta diária"
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => persistMode("hidden")}
-              className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
-              aria-label="Ocultar meta diária"
-            >
-              <EyeOff className="h-3.5 w-3.5" />
-            </button>
+            {!todayLabel && (
+              <>
+                <button
+                  onClick={() => setMode("mini")}
+                  className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                  aria-label="Reduzir meta diária"
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setMode("hidden")}
+                  className="grid h-6 w-6 place-items-center rounded-md text-white/80 hover:bg-white/10"
+                  aria-label="Ocultar meta diária"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">

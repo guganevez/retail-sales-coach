@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio, CalendarDays, Zap } from "lucide-react";
+import { ArrowRight, AlertTriangle, AlertCircle, Info, Sparkles, TrendingUp, FileEdit, X, Truck, Radio, CalendarDays, Zap, Eye } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StatCard } from "@/components/StatCard";
 import { DailyGoalCard, RealizedSource } from "@/components/DailyGoalCard";
@@ -12,6 +12,7 @@ import { ordersForRep, ordersForSupervisor, ordersForManager } from "@/lib/track
 import { useHolidays } from "@/lib/holidays";
 import { useAgenda, todayISO } from "@/lib/agenda";
 import { computeDailyPace } from "@/lib/workdays";
+import { useDailyGoalView } from "@/lib/dailyGoalView";
 
 const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
@@ -23,6 +24,7 @@ const Index = () => {
   const { role, profile } = useProfile();
   const { holidays } = useHolidays();
   const { visits } = useAgenda();
+  const { mode: goalMode, setMode: setGoalMode } = useDailyGoalView();
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
   const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
   const draftTotals = draft ? computeTotals(draft.items, productMap) : null;
@@ -67,18 +69,28 @@ const Index = () => {
 
   return (
     <MobileShell
-      subtitle="Resumo de hoje"
-      title={`${formatBRL(salesperson.achievedToday)}`}
       rightSlot={
         <div className="mt-4">
-          <DailyGoalCard
-            monthlyGoal={salesperson.goalMonth}
-            achievedMonth={salesperson.achievedMonth}
-            achievedToday={salesperson.achievedToday}
-            holidays={holidaySet}
-            sources={sources}
-            compact
-          />
+          {goalMode === "hidden" ? (
+            <button
+              onClick={() => setGoalMode("full")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition hover:bg-white/15"
+              aria-label="Mostrar resumo e meta diária"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Mostrar resumo de hoje + meta
+            </button>
+          ) : (
+            <DailyGoalCard
+              monthlyGoal={salesperson.goalMonth}
+              achievedMonth={salesperson.achievedMonth}
+              achievedToday={salesperson.achievedToday}
+              holidays={holidaySet}
+              sources={sources}
+              compact
+              todayLabel="Resumo de hoje"
+            />
+          )}
         </div>
       }
     >

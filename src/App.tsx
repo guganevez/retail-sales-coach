@@ -20,6 +20,7 @@ import { DraftProvider } from "./lib/draft";
 import { HolidaysProvider } from "./lib/holidays";
 import { AgendaProvider } from "./lib/agenda";
 import { CycleProvider } from "./lib/cycleConfig";
+import { DailyGoalViewProvider } from "./lib/dailyGoalView";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +35,8 @@ const App = () => (
             <AgendaProvider>
               <QuotesProvider>
                 <DraftProvider>
-                  <BrowserRouter>
+                  <DailyGoalViewProvider>
+                    <BrowserRouter>
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/clientes" element={<Clientes />} />
@@ -50,6 +52,7 @@ const App = () => (
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </BrowserRouter>
+                  </DailyGoalViewProvider>
                 </DraftProvider>
               </QuotesProvider>
             </AgendaProvider>

@@ -24,6 +24,7 @@ const Index = () => {
   const { role, profile } = useProfile();
   const { holidays } = useHolidays();
   const { visits } = useAgenda();
+  const { mode: goalMode, setMode: setGoalMode } = useDailyGoalView();
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
   const draftClient = draft?.clientId ? clients.find(c => c.id === draft.clientId) : null;
   const draftTotals = draft ? computeTotals(draft.items, productMap) : null;

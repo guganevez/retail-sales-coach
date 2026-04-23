@@ -451,13 +451,25 @@ const Agenda = () => {
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => remove(v.id)}
-                      className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
-                      aria-label="Remover"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      {v.status !== "concluida" && (
+                        <button
+                          onClick={() => openRescheduleDialog(v)}
+                          className="grid h-8 w-8 place-items-center rounded-lg text-primary transition active:scale-95 hover:bg-primary/10"
+                          aria-label="Reagendar"
+                          title="Reagendar"
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => remove(v.id)}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-muted"
+                        aria-label="Remover"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <CheckInOut visit={v} />
                 </div>

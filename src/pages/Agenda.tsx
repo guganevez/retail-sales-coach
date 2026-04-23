@@ -507,9 +507,18 @@ const Agenda = () => {
             onClick={handleForceVisit}
             disabled={!forceClient}
             className="rounded-xl bg-warning px-3 py-2 text-xs font-bold text-warning-foreground disabled:opacity-50"
+            title={`Adicionar para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`}
           >
             <CalendarPlus className="mr-1 inline h-4 w-4" />
             Adicionar
+          </button>
+          <button
+            onClick={handleForceVisitWithDate}
+            disabled={!forceClient}
+            className="rounded-xl border border-warning bg-card px-3 py-2 text-xs font-bold text-warning disabled:opacity-50"
+            title="Escolher outra data e turno"
+          >
+            <CalendarClock className="h-4 w-4" />
           </button>
         </div>
       </section>

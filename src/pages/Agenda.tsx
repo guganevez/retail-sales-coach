@@ -562,14 +562,26 @@ const Agenda = () => {
                     Ticket {formatBRL(client.avgTicket)} · {client.segment}
                   </p>
                 </div>
-                <button
-                  onClick={() => quickSchedule(client.id)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition active:scale-95"
-                  aria-label={`Agendar ${client.fantasy} agora`}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Agendar
-                </button>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button
+                    onClick={() => quickSchedule(client.id)}
+                    className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition active:scale-95"
+                    aria-label={`Agendar ${client.fantasy} para ${formatDateLabel(selectedDate).split(" · ")[1]}`}
+                    title={`Agendar para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agendar
+                  </button>
+                  <button
+                    onClick={() => openScheduleDialog(client.id)}
+                    className="inline-flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-card px-3 py-1.5 text-[11px] font-semibold text-primary transition active:scale-95 hover:bg-primary/5"
+                    aria-label={`Escolher data para ${client.fantasy}`}
+                    title="Escolher outra data"
+                  >
+                    <CalendarClock className="h-3 w-3" />
+                    Outra data
+                  </button>
+                </div>
               </div>
             ))}
           </div>

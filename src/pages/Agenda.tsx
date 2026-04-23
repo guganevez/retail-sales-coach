@@ -108,27 +108,91 @@ const Agenda = () => {
     return arr;
   }, []);
 
-  /** Agenda 1-toque: usa data + turno selecionados, sem duplicar. */
-  const quickSchedule = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
+  /** Agenda 1-toque: usa data + turno selecionados (ou customizados), sem duplicar. */
+  const quickSchedule = (
+    clientId: string,
+    origin: Visit["origin"] = "sugestao_ciclo",
+    overrideDate?: string,
+    overrideShift?: VisitShift,
+  ) => {
     const c = clientMap[clientId];
     if (!c) return;
+    const date = overrideDate ?? selectedDate;
+    const shift = overrideShift ?? selectedShift;
     const { created } = ensureScheduled({
       clientId,
-      date: selectedDate,
-      shift: selectedShift,
+      date,
+      shift,
       status: "pendente",
       origin,
       projected: c.avgTicket,
     });
     flash(created
-      ? `${c.fantasy} agendado para ${formatDateLabel(selectedDate).split(" · ")[1]} (${selectedShift})`
+      ? `${c.fantasy} agendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`
       : `${c.fantasy} já estava na agenda deste dia`
     );
+    if (overrideDate && overrideDate !== selectedDate) {
+      // Salta para o dia agendado para feedback visual
+      setSelectedDate(overrideDate);
+    }
+  };
+
+  /** Abre o diálogo para escolher data/turno antes de agendar */
+  const openScheduleDialog = (clientId: string, origin: Visit["origin"] = "sugestao_ciclo") => {
+    setScheduleDialog({
+      mode: "create",
+      clientId,
+      origin,
+      date: selectedDate,
+      shift: selectedShift,
+    });
+  };
+
+  /** Abre o diálogo para reagendar uma visita existente */
+  const openRescheduleDialog = (v: Visit) => {
+    setScheduleDialog({
+      mode: "reschedule",
+      clientId: v.clientId,
+      visitId: v.id,
+      date: v.date,
+      shift: v.shift,
+    });
+  };
+
+  /** Confirma o agendamento (cria ou reagenda) */
+  const handleScheduleConfirm = (date: string, shift: VisitShift) => {
+    if (!scheduleDialog) return;
+    const c = clientMap[scheduleDialog.clientId];
+    if (!c) return;
+
+    if (scheduleDialog.mode === "reschedule" && scheduleDialog.visitId) {
+      // Verifica conflito: outra visita do mesmo cliente já existe naquele dia?
+      const conflict = visits.find(
+        v => v.id !== scheduleDialog.visitId
+          && v.clientId === scheduleDialog.clientId
+          && v.date === date
+      );
+      if (conflict) {
+        flash(`${c.fantasy} já tem visita em ${formatDateLabel(date).split(" · ")[1]}`);
+        return;
+      }
+      update(scheduleDialog.visitId, { date, shift, status: "pendente" });
+      flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
+      setSelectedDate(date);
+    } else {
+      quickSchedule(scheduleDialog.clientId, scheduleDialog.origin ?? "sugestao_ciclo", date, shift);
+    }
   };
 
   const handleForceVisit = () => {
     if (!forceClient) return;
     quickSchedule(forceClient, "forcada");
+    setForceClient(null);
+  };
+
+  const handleForceVisitWithDate = () => {
+    if (!forceClient) return;
+    openScheduleDialog(forceClient, "forcada");
     setForceClient(null);
   };
 

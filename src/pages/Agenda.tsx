@@ -50,6 +50,16 @@ const Agenda = () => {
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
+  // Diálogo de agendar/reagendar com data + turno customizados
+  const [scheduleDialog, setScheduleDialog] = useState<{
+    mode: "create" | "reschedule";
+    clientId: string;
+    visitId?: string;          // só em reschedule
+    origin?: Visit["origin"];  // só em create
+    date: string;
+    shift: VisitShift;
+  } | null>(null);
+
   const flash = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);

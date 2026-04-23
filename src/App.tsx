@@ -20,6 +20,7 @@ import { DraftProvider } from "./lib/draft";
 import { HolidaysProvider } from "./lib/holidays";
 import { AgendaProvider } from "./lib/agenda";
 import { CycleProvider } from "./lib/cycleConfig";
+import { DailyGoalViewProvider } from "./lib/dailyGoalView";
 
 const queryClient = new QueryClient();
 

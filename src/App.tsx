@@ -52,6 +52,7 @@ const App = () => (
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </BrowserRouter>
+                  </DailyGoalViewProvider>
                 </DraftProvider>
               </QuotesProvider>
             </AgendaProvider>

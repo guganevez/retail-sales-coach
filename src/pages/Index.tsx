@@ -69,18 +69,28 @@ const Index = () => {
 
   return (
     <MobileShell
-      subtitle="Resumo de hoje"
-      title={`${formatBRL(salesperson.achievedToday)}`}
       rightSlot={
         <div className="mt-4">
-          <DailyGoalCard
-            monthlyGoal={salesperson.goalMonth}
-            achievedMonth={salesperson.achievedMonth}
-            achievedToday={salesperson.achievedToday}
-            holidays={holidaySet}
-            sources={sources}
-            compact
-          />
+          {goalMode === "hidden" ? (
+            <button
+              onClick={() => setGoalMode("full")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition hover:bg-white/15"
+              aria-label="Mostrar resumo e meta diária"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Mostrar resumo de hoje + meta
+            </button>
+          ) : (
+            <DailyGoalCard
+              monthlyGoal={salesperson.goalMonth}
+              achievedMonth={salesperson.achievedMonth}
+              achievedToday={salesperson.achievedToday}
+              holidays={holidaySet}
+              sources={sources}
+              compact
+              todayLabel="Resumo de hoje"
+            />
+          )}
         </div>
       }
     >

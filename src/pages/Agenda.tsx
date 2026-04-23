@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Plus, Clock, AlertTriangle, Sparkles, Trash2,
   CalendarPlus, Zap, TrendingDown, X, Target, MapPin, Sun, Moon, Sunset, Check,
+  CalendarClock,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { useAgenda, suggestionsForDate, todayISO, Visit, VisitShift } from "@/lib/agenda";
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { CheckInOut } from "@/components/CheckInOut";
 import { CycleEditor } from "@/components/CycleEditor";
 import { RouteSuggestion } from "@/components/RouteSuggestion";
+import { ScheduleDialog } from "@/components/ScheduleDialog";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 

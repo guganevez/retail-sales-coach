@@ -466,7 +466,7 @@ const Agenda = () => {
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
-                      {v.status !== "concluida" && (
+                      {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
                         <button
                           onClick={() => openRescheduleDialog(v)}
                           className="grid h-8 w-8 place-items-center rounded-lg text-primary transition active:scale-95 hover:bg-primary/10"
@@ -474,6 +474,16 @@ const Agenda = () => {
                           title="Reagendar"
                         >
                           <CalendarClock className="h-4 w-4" />
+                        </button>
+                      )}
+                      {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
+                        <button
+                          onClick={() => update(v.id, { status: "cancelada" })}
+                          className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-danger-soft hover:text-danger"
+                          aria-label="Cancelar visita"
+                          title="Cancelar visita"
+                        >
+                          <X className="h-4 w-4" />
                         </button>
                       )}
                       <button

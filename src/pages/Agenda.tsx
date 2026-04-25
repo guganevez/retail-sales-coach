@@ -20,6 +20,7 @@ import { CycleEditor } from "@/components/CycleEditor";
 import { RouteSuggestion } from "@/components/RouteSuggestion";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { UpcomingVisits } from "@/components/UpcomingVisits";
+import { VisitChecklist } from "@/components/VisitChecklist";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -496,6 +497,13 @@ const Agenda = () => {
                     </div>
                   </div>
                   <CheckInOut visit={v} />
+                  {v.status !== "cancelada" && v.status !== "remarcada" && (
+                    <VisitChecklist
+                      visit={v}
+                      onUpdate={update}
+                      defaultOpen={v.status === "em_visita"}
+                    />
+                  )}
                 </div>
               );
             })}

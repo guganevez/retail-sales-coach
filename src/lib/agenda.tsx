@@ -5,7 +5,7 @@ import { clients } from "./mock";
 import { getCycleInfo, suggestionScore } from "./cycle";
 import { Client } from "./types";
 
-const STORAGE_KEY = "negri.agenda.v2"; // bump por novos campos check-in
+const STORAGE_KEY = "negri.agenda.v3"; // bump por checklist
 
 export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada" | "cancelada";
 export type VisitOrigin = "programada" | "sugestao_ciclo" | "forcada";
@@ -16,6 +16,23 @@ export interface CheckPoint {
   geo?: { lat: number; lng: number } | null;
   geoError?: string;
 }
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+  /** Itens default não podem ser removidos, só desmarcados/marcados. */
+  builtin?: boolean;
+}
+
+export const DEFAULT_CHECKLIST: Omit<ChecklistItem, "done">[] = [
+  { id: "confirm_order",   label: "Confirmar pedido",   builtin: true },
+  { id: "collect_payment", label: "Coletar pagamento",  builtin: true },
+  { id: "update_stock",    label: "Atualizar estoque",  builtin: true },
+];
+
+export const buildDefaultChecklist = (): ChecklistItem[] =>
+  DEFAULT_CHECKLIST.map(i => ({ ...i, done: false }));
 
 export interface Visit {
   id: string;
@@ -29,6 +46,7 @@ export interface Visit {
   realized?: number;
   checkIn?: CheckPoint;
   checkOut?: CheckPoint;
+  checklist?: ChecklistItem[];
 }
 
 interface AgendaCtx {

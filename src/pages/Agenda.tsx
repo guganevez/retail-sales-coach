@@ -20,6 +20,7 @@ import { CycleEditor } from "@/components/CycleEditor";
 import { RouteSuggestion } from "@/components/RouteSuggestion";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { UpcomingVisits } from "@/components/UpcomingVisits";
+import { VisitChecklist } from "@/components/VisitChecklist";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 

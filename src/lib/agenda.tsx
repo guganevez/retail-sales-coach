@@ -7,7 +7,7 @@ import { Client } from "./types";
 
 const STORAGE_KEY = "negri.agenda.v2"; // bump por novos campos check-in
 
-export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada";
+export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada" | "cancelada";
 export type VisitOrigin = "programada" | "sugestao_ciclo" | "forcada";
 export type VisitShift = "manha" | "tarde" | "noite";
 
@@ -85,7 +85,12 @@ export function AgendaProvider({ children }: { children: ReactNode }) {
     remove: (id) => setVisits((prev) => prev.filter(v => v.id !== id)),
     forVendedor: () => visits,
     ensureScheduled: (input) => {
-      const existing = visits.find(v => v.clientId === input.clientId && v.date === input.date);
+      const existing = visits.find(v =>
+        v.clientId === input.clientId
+        && v.date === input.date
+        && v.status !== "cancelada"
+        && v.status !== "remarcada"
+      );
       if (existing) return { visit: existing, created: false };
       const nv: Visit = { ...input, id: `vt${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
       setVisits((prev) => [...prev, nv]);
@@ -108,7 +113,11 @@ export function suggestionsForDate(
   alreadyScheduled: Visit[],
   segmentOverrides?: Record<string, number>,
 ): Array<{ client: Client; info: ReturnType<typeof getCycleInfo>; score: number }> {
-  const usedIds = new Set(alreadyScheduled.filter(v => v.date === dateISO).map(v => v.clientId));
+  const usedIds = new Set(
+    alreadyScheduled
+      .filter(v => v.date === dateISO && v.status !== "cancelada" && v.status !== "remarcada")
+      .map(v => v.clientId)
+  );
   return clients
     .filter(c => c.status !== "bloqueado" && !usedIds.has(c.id))
     .map(c => {

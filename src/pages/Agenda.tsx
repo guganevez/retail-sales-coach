@@ -19,6 +19,7 @@ import { CheckInOut } from "@/components/CheckInOut";
 import { CycleEditor } from "@/components/CycleEditor";
 import { RouteSuggestion } from "@/components/RouteSuggestion";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
+import { UpcomingVisits } from "@/components/UpcomingVisits";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -166,17 +167,29 @@ const Agenda = () => {
     if (!c) return;
 
     if (scheduleDialog.mode === "reschedule" && scheduleDialog.visitId) {
-      // Verifica conflito: outra visita do mesmo cliente já existe naquele dia?
+      // Verifica conflito: outra visita ATIVA do mesmo cliente já existe naquele dia?
       const conflict = visits.find(
         v => v.id !== scheduleDialog.visitId
           && v.clientId === scheduleDialog.clientId
           && v.date === date
+          && v.status !== "cancelada"
+          && v.status !== "remarcada"
       );
       if (conflict) {
         flash(`${c.fantasy} já tem visita em ${formatDateLabel(date).split(" · ")[1]}`);
         return;
       }
-      update(scheduleDialog.visitId, { date, shift, status: "pendente" });
+      // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
+      const original = visits.find(v => v.id === scheduleDialog.visitId);
+      update(scheduleDialog.visitId, { status: "remarcada" });
+      add({
+        clientId: scheduleDialog.clientId,
+        date,
+        shift,
+        status: "pendente",
+        origin: original?.origin ?? "programada",
+        projected: original?.projected ?? c.avgTicket,
+      });
       flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
       setSelectedDate(date);
     } else {
@@ -372,6 +385,13 @@ const Agenda = () => {
         })}
       </section>
 
+      {/* Próximas visitas (visão consolidada com status) */}
+      <UpcomingVisits
+        visits={visits}
+        onUpdate={update}
+        onReschedule={openRescheduleDialog}
+      />
+
       {/* Visitas programadas do dia */}
       <section className="mb-4">
         <div className="mb-2 flex items-center justify-between">
@@ -446,7 +466,7 @@ const Agenda = () => {
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
-                      {v.status !== "concluida" && (
+                      {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
                         <button
                           onClick={() => openRescheduleDialog(v)}
                           className="grid h-8 w-8 place-items-center rounded-lg text-primary transition active:scale-95 hover:bg-primary/10"
@@ -454,6 +474,16 @@ const Agenda = () => {
                           title="Reagendar"
                         >
                           <CalendarClock className="h-4 w-4" />
+                        </button>
+                      )}
+                      {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
+                        <button
+                          onClick={() => update(v.id, { status: "cancelada" })}
+                          className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-danger-soft hover:text-danger"
+                          aria-label="Cancelar visita"
+                          title="Cancelar visita"
+                        >
+                          <X className="h-4 w-4" />
                         </button>
                       )}
                       <button

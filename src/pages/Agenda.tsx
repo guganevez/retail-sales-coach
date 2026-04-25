@@ -385,6 +385,13 @@ const Agenda = () => {
         })}
       </section>
 
+      {/* Próximas visitas (visão consolidada com status) */}
+      <UpcomingVisits
+        visits={visits}
+        onUpdate={update}
+        onReschedule={openRescheduleDialog}
+      />
+
       {/* Visitas programadas do dia */}
       <section className="mb-4">
         <div className="mb-2 flex items-center justify-between">

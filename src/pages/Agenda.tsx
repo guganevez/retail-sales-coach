@@ -184,12 +184,6 @@ const Agenda = () => {
     }
   };
 
-  const handleForceVisit = () => {
-    if (!forceClient) return;
-    quickSchedule(forceClient, "forcada");
-    setForceClient(null);
-  };
-
   const handleForceVisitWithDate = () => {
     if (!forceClient) return;
     openScheduleDialog(forceClient, "forcada");

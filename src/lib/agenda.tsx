@@ -85,7 +85,12 @@ export function AgendaProvider({ children }: { children: ReactNode }) {
     remove: (id) => setVisits((prev) => prev.filter(v => v.id !== id)),
     forVendedor: () => visits,
     ensureScheduled: (input) => {
-      const existing = visits.find(v => v.clientId === input.clientId && v.date === input.date);
+      const existing = visits.find(v =>
+        v.clientId === input.clientId
+        && v.date === input.date
+        && v.status !== "cancelada"
+        && v.status !== "remarcada"
+      );
       if (existing) return { visit: existing, created: false };
       const nv: Visit = { ...input, id: `vt${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
       setVisits((prev) => [...prev, nv]);

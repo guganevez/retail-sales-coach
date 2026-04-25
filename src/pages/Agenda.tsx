@@ -497,6 +497,13 @@ const Agenda = () => {
                     </div>
                   </div>
                   <CheckInOut visit={v} />
+                  {v.status !== "cancelada" && v.status !== "remarcada" && (
+                    <VisitChecklist
+                      visit={v}
+                      onUpdate={update}
+                      defaultOpen={v.status === "em_visita"}
+                    />
+                  )}
                 </div>
               );
             })}

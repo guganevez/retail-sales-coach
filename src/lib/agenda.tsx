@@ -113,7 +113,11 @@ export function suggestionsForDate(
   alreadyScheduled: Visit[],
   segmentOverrides?: Record<string, number>,
 ): Array<{ client: Client; info: ReturnType<typeof getCycleInfo>; score: number }> {
-  const usedIds = new Set(alreadyScheduled.filter(v => v.date === dateISO).map(v => v.clientId));
+  const usedIds = new Set(
+    alreadyScheduled
+      .filter(v => v.date === dateISO && v.status !== "cancelada" && v.status !== "remarcada")
+      .map(v => v.clientId)
+  );
   return clients
     .filter(c => c.status !== "bloqueado" && !usedIds.has(c.id))
     .map(c => {

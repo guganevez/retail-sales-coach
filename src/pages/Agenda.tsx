@@ -167,17 +167,29 @@ const Agenda = () => {
     if (!c) return;
 
     if (scheduleDialog.mode === "reschedule" && scheduleDialog.visitId) {
-      // Verifica conflito: outra visita do mesmo cliente já existe naquele dia?
+      // Verifica conflito: outra visita ATIVA do mesmo cliente já existe naquele dia?
       const conflict = visits.find(
         v => v.id !== scheduleDialog.visitId
           && v.clientId === scheduleDialog.clientId
           && v.date === date
+          && v.status !== "cancelada"
+          && v.status !== "remarcada"
       );
       if (conflict) {
         flash(`${c.fantasy} já tem visita em ${formatDateLabel(date).split(" · ")[1]}`);
         return;
       }
-      update(scheduleDialog.visitId, { date, shift, status: "pendente" });
+      // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
+      const original = visits.find(v => v.id === scheduleDialog.visitId);
+      update(scheduleDialog.visitId, { status: "remarcada" });
+      add({
+        clientId: scheduleDialog.clientId,
+        date,
+        shift,
+        status: "pendente",
+        origin: original?.origin ?? "programada",
+        projected: original?.projected ?? c.avgTicket,
+      });
       flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
       setSelectedDate(date);
     } else {

@@ -7,7 +7,7 @@ import { Client } from "./types";
 
 const STORAGE_KEY = "negri.agenda.v2"; // bump por novos campos check-in
 
-export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada";
+export type VisitStatus = "pendente" | "em_visita" | "concluida" | "remarcada" | "cancelada";
 export type VisitOrigin = "programada" | "sugestao_ciclo" | "forcada";
 export type VisitShift = "manha" | "tarde" | "noite";
 

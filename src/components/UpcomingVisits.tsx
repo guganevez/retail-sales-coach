@@ -92,11 +92,11 @@ export function UpcomingVisits({ visits, onUpdate, onReschedule, initialLimit = 
   const visible = expanded ? upcoming : upcoming.slice(0, initialLimit);
   const hasMore = upcoming.length > initialLimit;
 
+  const [cancelTarget, setCancelTarget] = useState<Visit | null>(null);
+
   const setStatus = (v: Visit, status: VisitStatus) => {
     if (status === "cancelada") {
-      const r = window.prompt("Motivo (cancelamento):", "");
-      if (r === null) return;
-      onUpdate(v.id, { status, cancelReason: r.trim() || undefined });
+      setCancelTarget(v);
       return;
     }
     onUpdate(v.id, { status });

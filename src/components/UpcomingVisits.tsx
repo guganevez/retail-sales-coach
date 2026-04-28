@@ -7,6 +7,7 @@ import {
 import { Visit, VisitStatus, VisitShift, todayISO } from "@/lib/agenda";
 import { clients, formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { ReasonPicker } from "@/components/ReasonPicker";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -92,11 +93,11 @@ export function UpcomingVisits({ visits, onUpdate, onReschedule, initialLimit = 
   const visible = expanded ? upcoming : upcoming.slice(0, initialLimit);
   const hasMore = upcoming.length > initialLimit;
 
+  const [cancelTarget, setCancelTarget] = useState<Visit | null>(null);
+
   const setStatus = (v: Visit, status: VisitStatus) => {
     if (status === "cancelada") {
-      const r = window.prompt("Motivo (cancelamento):", "");
-      if (r === null) return;
-      onUpdate(v.id, { status, cancelReason: r.trim() || undefined });
+      setCancelTarget(v);
       return;
     }
     onUpdate(v.id, { status });
@@ -253,6 +254,19 @@ export function UpcomingVisits({ visits, onUpdate, onReschedule, initialLimit = 
             <><ChevronDown className="h-3 w-3" /> Ver todas ({upcoming.length})</>
           )}
         </button>
+      )}
+
+      {cancelTarget && (
+        <ReasonPicker
+          open={!!cancelTarget}
+          mode="cancel"
+          clientName={clientMap[cancelTarget.clientId]?.fantasy}
+          onConfirm={(reason) => {
+            onUpdate(cancelTarget.id, { status: "cancelada", cancelReason: reason || undefined });
+            setCancelTarget(null);
+          }}
+          onCancel={() => setCancelTarget(null)}
+        />
       )}
     </section>
   );

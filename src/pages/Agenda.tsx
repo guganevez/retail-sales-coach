@@ -22,12 +22,7 @@ import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { UpcomingVisits } from "@/components/UpcomingVisits";
 import { VisitChecklist } from "@/components/VisitChecklist";
 import { DailySummaryPanel } from "@/components/DailySummaryPanel";
-
-const askReason = (label: string): string | null => {
-  const r = window.prompt(`Motivo (${label}):`, "");
-  if (r === null) return null; // cancelou o prompt
-  return r.trim();
-};
+import { ReasonPicker } from "@/components/ReasonPicker";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -67,6 +62,13 @@ const Agenda = () => {
     origin?: Visit["origin"];  // só em create
     date: string;
     shift: VisitShift;
+  } | null>(null);
+
+  // Diálogo de motivo (cancelamento/reagendamento)
+  const [reasonDialog, setReasonDialog] = useState<{
+    mode: "cancel" | "reschedule";
+    clientId: string;
+    onConfirm: (reason: string) => void;
   } | null>(null);
 
   const flash = (msg: string) => {
@@ -189,22 +191,32 @@ const Agenda = () => {
       }
       // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
       const original = visits.find(v => v.id === scheduleDialog.visitId);
-      const reason = askReason("reagendamento");
-      if (reason === null) return; // usuário cancelou o prompt
-      update(scheduleDialog.visitId, {
-        status: "remarcada",
-        rescheduleReason: reason || undefined,
+      const visitId = scheduleDialog.visitId;
+      const clientId = scheduleDialog.clientId;
+      // Fecha o diálogo de agendamento e abre o seletor de motivo.
+      setScheduleDialog(null);
+      setReasonDialog({
+        mode: "reschedule",
+        clientId,
+        onConfirm: (reason) => {
+          update(visitId, {
+            status: "remarcada",
+            rescheduleReason: reason || undefined,
+          });
+          add({
+            clientId,
+            date,
+            shift,
+            status: "pendente",
+            origin: original?.origin ?? "programada",
+            projected: original?.projected ?? c.avgTicket,
+          });
+          flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
+          setSelectedDate(date);
+          setReasonDialog(null);
+        },
       });
-      add({
-        clientId: scheduleDialog.clientId,
-        date,
-        shift,
-        status: "pendente",
-        origin: original?.origin ?? "programada",
-        projected: original?.projected ?? c.avgTicket,
-      });
-      flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
-      setSelectedDate(date);
+      return;
     } else {
       quickSchedule(scheduleDialog.clientId, scheduleDialog.origin ?? "sugestao_ciclo", date, shift);
     }
@@ -495,9 +507,14 @@ const Agenda = () => {
                       {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
                         <button
                           onClick={() => {
-                            const reason = askReason("cancelamento");
-                            if (reason === null) return;
-                            update(v.id, { status: "cancelada", cancelReason: reason || undefined });
+                            setReasonDialog({
+                              mode: "cancel",
+                              clientId: v.clientId,
+                              onConfirm: (reason) => {
+                                update(v.id, { status: "cancelada", cancelReason: reason || undefined });
+                                setReasonDialog(null);
+                              },
+                            });
                           }}
                           className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-danger-soft hover:text-danger"
                           aria-label="Cancelar visita"
@@ -733,6 +750,16 @@ const Agenda = () => {
           defaultShift={scheduleDialog.shift}
           confirmLabel={scheduleDialog.mode === "reschedule" ? "Reagendar" : "Agendar"}
           onConfirm={handleScheduleConfirm}
+        />
+      )}
+
+      {reasonDialog && (
+        <ReasonPicker
+          open={!!reasonDialog}
+          mode={reasonDialog.mode}
+          clientName={clientMap[reasonDialog.clientId]?.fantasy}
+          onConfirm={reasonDialog.onConfirm}
+          onCancel={() => setReasonDialog(null)}
         />
       )}
     </MobileShell>

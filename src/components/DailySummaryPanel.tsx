@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Activity, CheckCircle2, ListChecks, AlertTriangle, XCircle,
   CalendarClock, ChevronDown, ChevronUp, Clock, ListTodo,
+  Sun, Sunset, Moon, Layers,
 } from "lucide-react";
 import { Visit, VisitShift, todayISO } from "@/lib/agenda";
 import { clients } from "@/lib/mock";
@@ -48,7 +49,7 @@ export function DailySummaryPanel({ visits }: Props) {
       .filter(x => isLate(x.v, now))
       .sort((a, b) => b.mins - a.mins);
 
-    // Motivos agregados (cancel + reagendamento)
+    // Motivos agregados (cancel + reagendamento) — global
     const motivos = new Map<string, number>();
     [...canceladas, ...reagendadas].forEach(v => {
       const r = (v.cancelReason || v.rescheduleReason || "").trim();
@@ -64,6 +65,35 @@ export function DailySummaryPanel({ visits }: Props) {
       v => !(v.cancelReason || v.rescheduleReason)?.trim()
     ).length;
 
+    // Motivos por turno × tipo (cancel/reagend)
+    const shifts: VisitShift[] = ["manha", "tarde", "noite"];
+    const byShift = shifts.map(shift => {
+      const items = [...canceladas, ...reagendadas].filter(v => v.shift === shift);
+      const cancelMap = new Map<string, number>();
+      const remarcMap = new Map<string, number>();
+      let semMot = 0;
+      items.forEach(v => {
+        const reason = (v.cancelReason || v.rescheduleReason || "").trim();
+        if (!reason) { semMot++; return; }
+        const map = v.status === "cancelada" ? cancelMap : remarcMap;
+        map.set(reason, (map.get(reason) ?? 0) + 1);
+      });
+      const top = (m: Map<string, number>) =>
+        Array.from(m.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([label, count]) => ({ label, count }));
+      return {
+        shift,
+        total: items.length,
+        canceladas: items.filter(v => v.status === "cancelada").length,
+        reagendadas: items.filter(v => v.status === "remarcada").length,
+        cancelTop: top(cancelMap),
+        remarcTop: top(remarcMap),
+        semMotivo: semMot,
+      };
+    });
+
     const concluidaPct = total > 0 ? Math.round((realizadas.length / total) * 100) : 0;
 
     return {
@@ -78,6 +108,7 @@ export function DailySummaryPanel({ visits }: Props) {
       atrasos,
       motivosTop,
       semMotivo,
+      byShift,
       concluidaPct,
     };
   }, [dayVisits, now]);
@@ -256,6 +287,78 @@ export function DailySummaryPanel({ visits }: Props) {
                 )}
               </ul>
             )}
+          </div>
+
+          {/* Motivos por turno (full-width abaixo) */}
+          <div className="rounded-xl bg-muted/30 p-2.5 md:col-span-3">
+            <p className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              <Layers className="h-3 w-3" /> Motivos por turno
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {stats.byShift.map(s => {
+                const ShiftIcon = s.shift === "manha" ? Sun : s.shift === "tarde" ? Sunset : Moon;
+                const label = SHIFT_WINDOW[s.shift].label;
+                return (
+                  <div key={s.shift} className="rounded-lg border border-border/50 bg-background/60 p-2">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold capitalize">
+                        <ShiftIcon className="h-3 w-3 text-muted-foreground" />
+                        {label}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground num">
+                        {s.canceladas}c · {s.reagendadas}r
+                      </span>
+                    </div>
+
+                    {s.total === 0 ? (
+                      <p className="text-[10px] text-muted-foreground">Sem ocorrências.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {s.cancelTop.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-danger">
+                              Cancelamento
+                            </p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {s.cancelTop.map(m => (
+                                <li key={m.label} className="flex items-center justify-between gap-1.5">
+                                  <span className="truncate text-[11px]">{m.label}</span>
+                                  <span className="shrink-0 rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
+                                    {m.count}×
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {s.remarcTop.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-warning">
+                              Reagendamento
+                            </p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {s.remarcTop.map(m => (
+                                <li key={m.label} className="flex items-center justify-between gap-1.5">
+                                  <span className="truncate text-[11px]">{m.label}</span>
+                                  <span className="shrink-0 rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
+                                    {m.count}×
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {s.semMotivo > 0 && (
+                          <p className="text-[10px] text-muted-foreground">
+                            {s.semMotivo} sem motivo
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

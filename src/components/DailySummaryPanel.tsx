@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Activity, CheckCircle2, ListChecks, AlertTriangle, XCircle,
   CalendarClock, ChevronDown, ChevronUp, Clock, ListTodo,
+  Sun, Sunset, Moon, Layers,
 } from "lucide-react";
 import { Visit, VisitShift, todayISO } from "@/lib/agenda";
 import { clients } from "@/lib/mock";
@@ -48,7 +49,7 @@ export function DailySummaryPanel({ visits }: Props) {
       .filter(x => isLate(x.v, now))
       .sort((a, b) => b.mins - a.mins);
 
-    // Motivos agregados (cancel + reagendamento)
+    // Motivos agregados (cancel + reagendamento) — global
     const motivos = new Map<string, number>();
     [...canceladas, ...reagendadas].forEach(v => {
       const r = (v.cancelReason || v.rescheduleReason || "").trim();
@@ -64,6 +65,35 @@ export function DailySummaryPanel({ visits }: Props) {
       v => !(v.cancelReason || v.rescheduleReason)?.trim()
     ).length;
 
+    // Motivos por turno × tipo (cancel/reagend)
+    const shifts: VisitShift[] = ["manha", "tarde", "noite"];
+    const byShift = shifts.map(shift => {
+      const items = [...canceladas, ...reagendadas].filter(v => v.shift === shift);
+      const cancelMap = new Map<string, number>();
+      const remarcMap = new Map<string, number>();
+      let semMot = 0;
+      items.forEach(v => {
+        const reason = (v.cancelReason || v.rescheduleReason || "").trim();
+        if (!reason) { semMot++; return; }
+        const map = v.status === "cancelada" ? cancelMap : remarcMap;
+        map.set(reason, (map.get(reason) ?? 0) + 1);
+      });
+      const top = (m: Map<string, number>) =>
+        Array.from(m.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([label, count]) => ({ label, count }));
+      return {
+        shift,
+        total: items.length,
+        canceladas: items.filter(v => v.status === "cancelada").length,
+        reagendadas: items.filter(v => v.status === "remarcada").length,
+        cancelTop: top(cancelMap),
+        remarcTop: top(remarcMap),
+        semMotivo: semMot,
+      };
+    });
+
     const concluidaPct = total > 0 ? Math.round((realizadas.length / total) * 100) : 0;
 
     return {
@@ -78,6 +108,7 @@ export function DailySummaryPanel({ visits }: Props) {
       atrasos,
       motivosTop,
       semMotivo,
+      byShift,
       concluidaPct,
     };
   }, [dayVisits, now]);

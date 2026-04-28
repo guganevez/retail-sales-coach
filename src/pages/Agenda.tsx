@@ -280,6 +280,9 @@ const Agenda = () => {
         </section>
       )}
 
+      {/* Resumo do dia · produtividade */}
+      <DailySummaryPanel visits={visits} />
+
       {/* Simulador da meta diária */}
       <section className="mb-4 rounded-2xl bg-card p-4 shadow-soft">
         <div className="flex items-start justify-between">

@@ -1,31 +1,14 @@
 import { useMemo, useState } from "react";
 import {
   Activity, CheckCircle2, ListChecks, AlertTriangle, XCircle,
-  CalendarClock, ChevronDown, ChevronUp, Clock,
+  CalendarClock, ChevronDown, ChevronUp, Clock, ListTodo,
 } from "lucide-react";
 import { Visit, VisitShift, todayISO } from "@/lib/agenda";
 import { clients } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { lateMinutes, isLate, checklistProgress, pendingChecklist, SHIFT_WINDOW } from "@/lib/visitMetrics";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
-
-/** Hora limite (em horas locais) considerada "fim" de cada turno. */
-const SHIFT_END_HOUR: Record<VisitShift, number> = {
-  manha: 12,
-  tarde: 18,
-  noite: 22,
-};
-
-const SHIFT_LABEL: Record<VisitShift, string> = {
-  manha: "manhã",
-  tarde: "tarde",
-  noite: "noite",
-};
-
-const checklistDone = (v: Visit) => {
-  if (!v.checklist || v.checklist.length === 0) return false;
-  return v.checklist.every(i => i.done);
-};
 
 interface Props {
   visits: Visit[];
@@ -35,7 +18,6 @@ export function DailySummaryPanel({ visits }: Props) {
   const [expanded, setExpanded] = useState(false);
   const today = todayISO();
   const now = new Date();
-  const currentHour = now.getHours() + now.getMinutes() / 60;
 
   const dayVisits = useMemo(
     () => visits.filter(v => v.date === today),
@@ -49,30 +31,29 @@ export function DailySummaryPanel({ visits }: Props) {
     const reagendadas = dayVisits.filter(v => v.status === "remarcada");
     const pendentes = dayVisits.filter(v => v.status === "pendente" || v.status === "em_visita");
 
-    const checklist100 = realizadas.filter(checklistDone);
+    const checklist100 = realizadas.filter(v => checklistProgress(v) === 100);
     const checklistRate = realizadas.length > 0
       ? Math.round((checklist100.length / realizadas.length) * 100)
       : 0;
 
-    // Atrasos: pendentes cujo turno já encerrou; ou em_visita com check-in após o fim do turno.
-    const atrasos = dayVisits.filter(v => {
-      if (v.status === "pendente" || v.status === "em_visita") {
-        return currentHour > SHIFT_END_HOUR[v.shift];
-      }
-      if (v.status === "concluida" && v.checkIn?.at) {
-        const ci = new Date(v.checkIn.at);
-        return ci.getHours() + ci.getMinutes() / 60 > SHIFT_END_HOUR[v.shift];
-      }
-      return false;
-    });
+    // Checklist parcial (1–99%) — onde a execução está incompleta
+    const parcial = dayVisits
+      .map(v => ({ v, pct: checklistProgress(v) }))
+      .filter(({ v, pct }) => pct >= 1 && pct < 100 && v.status !== "cancelada" && v.status !== "remarcada")
+      .sort((a, b) => a.pct - b.pct);
+
+    // Atrasos baseados em horário real (check-in) ou em hora atual vs fim do turno
+    const atrasos = dayVisits
+      .map(v => ({ v, mins: lateMinutes(v, now) }))
+      .filter(x => isLate(x.v, now))
+      .sort((a, b) => b.mins - a.mins);
 
     // Motivos agregados (cancel + reagendamento)
     const motivos = new Map<string, number>();
     [...canceladas, ...reagendadas].forEach(v => {
       const r = (v.cancelReason || v.rescheduleReason || "").trim();
       if (!r) return;
-      const key = r.toLowerCase();
-      motivos.set(key, (motivos.get(key) ?? 0) + 1);
+      motivos.set(r, (motivos.get(r) ?? 0) + 1);
     });
     const motivosTop = Array.from(motivos.entries())
       .sort((a, b) => b[1] - a[1])
@@ -93,12 +74,13 @@ export function DailySummaryPanel({ visits }: Props) {
       pendentes: pendentes.length,
       checklist100: checklist100.length,
       checklistRate,
+      parcial,
       atrasos,
       motivosTop,
       semMotivo,
       concluidaPct,
     };
-  }, [dayVisits, currentHour]);
+  }, [dayVisits, now]);
 
   if (stats.total === 0) return null;
 
@@ -120,7 +102,7 @@ export function DailySummaryPanel({ visits }: Props) {
       </div>
 
       {/* KPIs principais */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <KpiTile
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
           label="Realizadas"
@@ -136,10 +118,17 @@ export function DailySummaryPanel({ visits }: Props) {
           tone={stats.checklistRate >= 80 ? "success" : stats.checklistRate >= 50 ? "primary" : "warning"}
         />
         <KpiTile
+          icon={<ListTodo className="h-3.5 w-3.5" />}
+          label="Checklist parcial"
+          value={`${stats.parcial.length}`}
+          hint={stats.parcial.length > 0 ? "execução em aberto" : "tudo em ordem"}
+          tone={stats.parcial.length > 0 ? "warning" : "muted"}
+        />
+        <KpiTile
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           label="Atrasos"
           value={`${stats.atrasos.length}`}
-          hint={stats.atrasos.length > 0 ? "turno excedido" : "no horário"}
+          hint={stats.atrasos.length > 0 ? `máx ${stats.atrasos[0].mins}min` : "no horário"}
           tone={stats.atrasos.length > 0 ? "warning" : "muted"}
         />
         <KpiTile
@@ -152,8 +141,8 @@ export function DailySummaryPanel({ visits }: Props) {
       </div>
 
       {expanded && (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {/* Lista de atrasos */}
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {/* Atrasos */}
           <div className="rounded-xl bg-muted/30 p-2.5">
             <p className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-warning">
               <Clock className="h-3 w-3" /> Atrasos ({stats.atrasos.length})
@@ -162,15 +151,19 @@ export function DailySummaryPanel({ visits }: Props) {
               <p className="text-[11px] text-muted-foreground">Nenhum atraso até agora.</p>
             ) : (
               <ul className="space-y-1">
-                {stats.atrasos.slice(0, 6).map(v => {
+                {stats.atrasos.slice(0, 6).map(({ v, mins }) => {
                   const c = clientMap[v.clientId];
+                  const win = SHIFT_WINDOW[v.shift];
                   return (
                     <li key={v.id} className="flex items-center justify-between gap-2 rounded-lg bg-background/60 px-2 py-1">
-                      <span className="truncate text-[11px] font-semibold">
+                      <span className="min-w-0 truncate text-[11px] font-semibold">
                         {c?.fantasy ?? v.clientId}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          ({win.label} até {String(win.end).padStart(2, "0")}h)
+                        </span>
                       </span>
-                      <span className="shrink-0 rounded-full bg-warning-soft px-1.5 py-0.5 text-[9px] font-bold text-warning">
-                        {SHIFT_LABEL[v.shift]} · {v.status === "pendente" ? "não iniciada" : v.status === "em_visita" ? "em curso" : "tardia"}
+                      <span className="shrink-0 rounded-full bg-warning-soft px-1.5 py-0.5 text-[9px] font-bold text-warning num">
+                        +{mins}min
                       </span>
                     </li>
                   );
@@ -182,10 +175,63 @@ export function DailySummaryPanel({ visits }: Props) {
             )}
           </div>
 
+          {/* Checklist parcial */}
+          <div className="rounded-xl bg-muted/30 p-2.5">
+            <p className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+              <ListTodo className="h-3 w-3" /> Checklist parcial ({stats.parcial.length})
+            </p>
+            {stats.parcial.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">Nenhuma execução parcial.</p>
+            ) : (
+              <ul className="space-y-1">
+                {stats.parcial.slice(0, 6).map(({ v, pct }) => {
+                  const c = clientMap[v.clientId];
+                  const pend = pendingChecklist(v);
+                  return (
+                    <li key={v.id} className="rounded-lg bg-background/60 px-2 py-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-[11px] font-semibold">
+                          {c?.fantasy ?? v.clientId}
+                        </span>
+                        <span className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold num",
+                          pct >= 75 ? "bg-success-soft text-success"
+                          : pct >= 40 ? "bg-primary/15 text-primary"
+                          : "bg-warning-soft text-warning"
+                        )}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full",
+                            pct >= 75 ? "bg-success"
+                            : pct >= 40 ? "bg-primary"
+                            : "bg-warning"
+                          )}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {pend.length > 0 && (
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                          Falta: {pend.slice(0, 2).join(", ")}
+                          {pend.length > 2 && ` +${pend.length - 2}`}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+                {stats.parcial.length > 6 && (
+                  <li className="text-[10px] text-muted-foreground">+{stats.parcial.length - 6} outras</li>
+                )}
+              </ul>
+            )}
+          </div>
+
           {/* Motivos */}
           <div className="rounded-xl bg-muted/30 p-2.5">
             <p className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-danger">
-              <CalendarClock className="h-3 w-3" /> Motivos (cancel/reagendamento)
+              <CalendarClock className="h-3 w-3" /> Motivos
             </p>
             {stats.motivosTop.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
@@ -197,7 +243,7 @@ export function DailySummaryPanel({ visits }: Props) {
               <ul className="space-y-1">
                 {stats.motivosTop.map(m => (
                   <li key={m.label} className="flex items-center justify-between gap-2 rounded-lg bg-background/60 px-2 py-1">
-                    <span className="truncate text-[11px] capitalize">{m.label}</span>
+                    <span className="truncate text-[11px]">{m.label}</span>
                     <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[9px] font-bold text-danger num">
                       {m.count}×
                     </span>

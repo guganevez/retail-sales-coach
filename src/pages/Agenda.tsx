@@ -21,6 +21,13 @@ import { RouteSuggestion } from "@/components/RouteSuggestion";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { UpcomingVisits } from "@/components/UpcomingVisits";
 import { VisitChecklist } from "@/components/VisitChecklist";
+import { DailySummaryPanel } from "@/components/DailySummaryPanel";
+
+const askReason = (label: string): string | null => {
+  const r = window.prompt(`Motivo (${label}):`, "");
+  if (r === null) return null; // cancelou o prompt
+  return r.trim();
+};
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 

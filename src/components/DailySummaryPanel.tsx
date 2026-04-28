@@ -288,6 +288,78 @@ export function DailySummaryPanel({ visits }: Props) {
               </ul>
             )}
           </div>
+
+          {/* Motivos por turno (full-width abaixo) */}
+          <div className="rounded-xl bg-muted/30 p-2.5 md:col-span-3">
+            <p className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              <Layers className="h-3 w-3" /> Motivos por turno
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {stats.byShift.map(s => {
+                const ShiftIcon = s.shift === "manha" ? Sun : s.shift === "tarde" ? Sunset : Moon;
+                const label = SHIFT_WINDOW[s.shift].label;
+                return (
+                  <div key={s.shift} className="rounded-lg border border-border/50 bg-background/60 p-2">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold capitalize">
+                        <ShiftIcon className="h-3 w-3 text-muted-foreground" />
+                        {label}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground num">
+                        {s.canceladas}c · {s.reagendadas}r
+                      </span>
+                    </div>
+
+                    {s.total === 0 ? (
+                      <p className="text-[10px] text-muted-foreground">Sem ocorrências.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {s.cancelTop.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-danger">
+                              Cancelamento
+                            </p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {s.cancelTop.map(m => (
+                                <li key={m.label} className="flex items-center justify-between gap-1.5">
+                                  <span className="truncate text-[11px]">{m.label}</span>
+                                  <span className="shrink-0 rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
+                                    {m.count}×
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {s.remarcTop.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-warning">
+                              Reagendamento
+                            </p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {s.remarcTop.map(m => (
+                                <li key={m.label} className="flex items-center justify-between gap-1.5">
+                                  <span className="truncate text-[11px]">{m.label}</span>
+                                  <span className="shrink-0 rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
+                                    {m.count}×
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {s.semMotivo > 0 && (
+                          <p className="text-[10px] text-muted-foreground">
+                            {s.semMotivo} sem motivo
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </section>

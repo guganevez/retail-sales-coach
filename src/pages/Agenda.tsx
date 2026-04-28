@@ -21,6 +21,13 @@ import { RouteSuggestion } from "@/components/RouteSuggestion";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { UpcomingVisits } from "@/components/UpcomingVisits";
 import { VisitChecklist } from "@/components/VisitChecklist";
+import { DailySummaryPanel } from "@/components/DailySummaryPanel";
+
+const askReason = (label: string): string | null => {
+  const r = window.prompt(`Motivo (${label}):`, "");
+  if (r === null) return null; // cancelou o prompt
+  return r.trim();
+};
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -182,7 +189,12 @@ const Agenda = () => {
       }
       // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
       const original = visits.find(v => v.id === scheduleDialog.visitId);
-      update(scheduleDialog.visitId, { status: "remarcada" });
+      const reason = askReason("reagendamento");
+      if (reason === null) return; // usuário cancelou o prompt
+      update(scheduleDialog.visitId, {
+        status: "remarcada",
+        rescheduleReason: reason || undefined,
+      });
       add({
         clientId: scheduleDialog.clientId,
         date,
@@ -267,6 +279,9 @@ const Agenda = () => {
           </div>
         </section>
       )}
+
+      {/* Resumo do dia · produtividade */}
+      <DailySummaryPanel visits={visits} />
 
       {/* Simulador da meta diária */}
       <section className="mb-4 rounded-2xl bg-card p-4 shadow-soft">
@@ -479,7 +494,11 @@ const Agenda = () => {
                       )}
                       {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
                         <button
-                          onClick={() => update(v.id, { status: "cancelada" })}
+                          onClick={() => {
+                            const reason = askReason("cancelamento");
+                            if (reason === null) return;
+                            update(v.id, { status: "cancelada", cancelReason: reason || undefined });
+                          }}
                           className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-danger-soft hover:text-danger"
                           aria-label="Cancelar visita"
                           title="Cancelar visita"

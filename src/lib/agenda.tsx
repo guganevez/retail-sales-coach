@@ -47,6 +47,10 @@ export interface Visit {
   checkIn?: CheckPoint;
   checkOut?: CheckPoint;
   checklist?: ChecklistItem[];
+  /** Motivo informado ao cancelar a visita. */
+  cancelReason?: string;
+  /** Motivo informado ao reagendar a visita. */
+  rescheduleReason?: string;
 }
 
 interface AgendaCtx {

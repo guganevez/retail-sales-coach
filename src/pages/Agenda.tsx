@@ -189,7 +189,12 @@ const Agenda = () => {
       }
       // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
       const original = visits.find(v => v.id === scheduleDialog.visitId);
-      update(scheduleDialog.visitId, { status: "remarcada" });
+      const reason = askReason("reagendamento");
+      if (reason === null) return; // usuário cancelou o prompt
+      update(scheduleDialog.visitId, {
+        status: "remarcada",
+        rescheduleReason: reason || undefined,
+      });
       add({
         clientId: scheduleDialog.clientId,
         date,

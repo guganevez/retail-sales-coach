@@ -491,7 +491,11 @@ const Agenda = () => {
                       )}
                       {v.status !== "concluida" && v.status !== "cancelada" && v.status !== "remarcada" && (
                         <button
-                          onClick={() => update(v.id, { status: "cancelada" })}
+                          onClick={() => {
+                            const reason = askReason("cancelamento");
+                            if (reason === null) return;
+                            update(v.id, { status: "cancelada", cancelReason: reason || undefined });
+                          }}
                           className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition active:scale-95 hover:bg-danger-soft hover:text-danger"
                           aria-label="Cancelar visita"
                           title="Cancelar visita"

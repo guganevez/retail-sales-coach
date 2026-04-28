@@ -191,22 +191,32 @@ const Agenda = () => {
       }
       // Marca a visita antiga como "remarcada" (mantém histórico) e cria nova pendente.
       const original = visits.find(v => v.id === scheduleDialog.visitId);
-      const reason = askReason("reagendamento");
-      if (reason === null) return; // usuário cancelou o prompt
-      update(scheduleDialog.visitId, {
-        status: "remarcada",
-        rescheduleReason: reason || undefined,
+      const visitId = scheduleDialog.visitId;
+      const clientId = scheduleDialog.clientId;
+      // Fecha o diálogo de agendamento e abre o seletor de motivo.
+      setScheduleDialog(null);
+      setReasonDialog({
+        mode: "reschedule",
+        clientId,
+        onConfirm: (reason) => {
+          update(visitId, {
+            status: "remarcada",
+            rescheduleReason: reason || undefined,
+          });
+          add({
+            clientId,
+            date,
+            shift,
+            status: "pendente",
+            origin: original?.origin ?? "programada",
+            projected: original?.projected ?? c.avgTicket,
+          });
+          flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
+          setSelectedDate(date);
+          setReasonDialog(null);
+        },
       });
-      add({
-        clientId: scheduleDialog.clientId,
-        date,
-        shift,
-        status: "pendente",
-        origin: original?.origin ?? "programada",
-        projected: original?.projected ?? c.avgTicket,
-      });
-      flash(`${c.fantasy} reagendado para ${formatDateLabel(date).split(" · ")[1]} (${shift})`);
-      setSelectedDate(date);
+      return;
     } else {
       quickSchedule(scheduleDialog.clientId, scheduleDialog.origin ?? "sugestao_ciclo", date, shift);
     }

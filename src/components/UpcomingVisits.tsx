@@ -7,6 +7,7 @@ import {
 import { Visit, VisitStatus, VisitShift, todayISO } from "@/lib/agenda";
 import { clients, formatBRL } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { ReasonPicker } from "@/components/ReasonPicker";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 

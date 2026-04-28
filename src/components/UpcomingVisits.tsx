@@ -255,6 +255,19 @@ export function UpcomingVisits({ visits, onUpdate, onReschedule, initialLimit = 
           )}
         </button>
       )}
+
+      {cancelTarget && (
+        <ReasonPicker
+          open={!!cancelTarget}
+          mode="cancel"
+          clientName={clientMap[cancelTarget.clientId]?.fantasy}
+          onConfirm={(reason) => {
+            onUpdate(cancelTarget.id, { status: "cancelada", cancelReason: reason || undefined });
+            setCancelTarget(null);
+          }}
+          onCancel={() => setCancelTarget(null)}
+        />
+      )}
     </section>
   );
 }

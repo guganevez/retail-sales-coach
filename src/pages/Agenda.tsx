@@ -64,6 +64,13 @@ const Agenda = () => {
     shift: VisitShift;
   } | null>(null);
 
+  // Diálogo de motivo (cancelamento/reagendamento)
+  const [reasonDialog, setReasonDialog] = useState<{
+    mode: "cancel" | "reschedule";
+    clientId: string;
+    onConfirm: (reason: string) => void;
+  } | null>(null);
+
   const flash = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);

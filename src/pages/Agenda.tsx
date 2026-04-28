@@ -752,6 +752,16 @@ const Agenda = () => {
           onConfirm={handleScheduleConfirm}
         />
       )}
+
+      {reasonDialog && (
+        <ReasonPicker
+          open={!!reasonDialog}
+          mode={reasonDialog.mode}
+          clientName={clientMap[reasonDialog.clientId]?.fantasy}
+          onConfirm={reasonDialog.onConfirm}
+          onCancel={() => setReasonDialog(null)}
+        />
+      )}
     </MobileShell>
   );
 };

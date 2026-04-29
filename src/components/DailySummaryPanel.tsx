@@ -8,6 +8,7 @@ import { Visit, VisitShift, todayISO } from "@/lib/agenda";
 import { clients } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 import { lateMinutes, isLate, checklistProgress, pendingChecklist, SHIFT_WINDOW } from "@/lib/visitMetrics";
+import { ActionPlansPanel, NewPlanButton } from "./ActionPlansPanel";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 
@@ -275,9 +276,12 @@ export function DailySummaryPanel({ visits }: Props) {
                 {stats.motivosTop.map(m => (
                   <li key={m.label} className="flex items-center justify-between gap-2 rounded-lg bg-background/60 px-2 py-1">
                     <span className="truncate text-[11px]">{m.label}</span>
-                    <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[9px] font-bold text-danger num">
-                      {m.count}×
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <NewPlanButton reason={m.label} compact />
+                      <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[9px] font-bold text-danger num">
+                        {m.count}×
+                      </span>
+                    </div>
                   </li>
                 ))}
                 {stats.semMotivo > 0 && (
@@ -323,9 +327,12 @@ export function DailySummaryPanel({ visits }: Props) {
                               {s.cancelTop.map(m => (
                                 <li key={m.label} className="flex items-center justify-between gap-1.5">
                                   <span className="truncate text-[11px]">{m.label}</span>
-                                  <span className="shrink-0 rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
-                                    {m.count}×
-                                  </span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <NewPlanButton reason={m.label} compact />
+                                    <span className="rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
+                                      {m.count}×
+                                    </span>
+                                  </div>
                                 </li>
                               ))}
                             </ul>
@@ -340,9 +347,12 @@ export function DailySummaryPanel({ visits }: Props) {
                               {s.remarcTop.map(m => (
                                 <li key={m.label} className="flex items-center justify-between gap-1.5">
                                   <span className="truncate text-[11px]">{m.label}</span>
-                                  <span className="shrink-0 rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
-                                    {m.count}×
-                                  </span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <NewPlanButton reason={m.label} compact />
+                                    <span className="rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
+                                      {m.count}×
+                                    </span>
+                                  </div>
                                 </li>
                               ))}
                             </ul>
@@ -359,6 +369,11 @@ export function DailySummaryPanel({ visits }: Props) {
                 );
               })}
             </div>
+          </div>
+
+          {/* Planos de ação (full-width) */}
+          <div className="md:col-span-3">
+            <ActionPlansPanel />
           </div>
         </div>
       )}

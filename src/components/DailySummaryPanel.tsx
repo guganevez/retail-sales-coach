@@ -8,6 +8,7 @@ import { Visit, VisitShift, todayISO } from "@/lib/agenda";
 import { clients } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 import { lateMinutes, isLate, checklistProgress, pendingChecklist, SHIFT_WINDOW } from "@/lib/visitMetrics";
+import { ActionPlansPanel, NewPlanButton } from "./ActionPlansPanel";
 
 const clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
 

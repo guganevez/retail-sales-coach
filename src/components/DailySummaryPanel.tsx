@@ -327,9 +327,12 @@ export function DailySummaryPanel({ visits }: Props) {
                               {s.cancelTop.map(m => (
                                 <li key={m.label} className="flex items-center justify-between gap-1.5">
                                   <span className="truncate text-[11px]">{m.label}</span>
-                                  <span className="shrink-0 rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
-                                    {m.count}×
-                                  </span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <NewPlanButton reason={m.label} compact />
+                                    <span className="rounded-full bg-danger-soft px-1.5 text-[9px] font-bold text-danger num">
+                                      {m.count}×
+                                    </span>
+                                  </div>
                                 </li>
                               ))}
                             </ul>
@@ -344,9 +347,12 @@ export function DailySummaryPanel({ visits }: Props) {
                               {s.remarcTop.map(m => (
                                 <li key={m.label} className="flex items-center justify-between gap-1.5">
                                   <span className="truncate text-[11px]">{m.label}</span>
-                                  <span className="shrink-0 rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
-                                    {m.count}×
-                                  </span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <NewPlanButton reason={m.label} compact />
+                                    <span className="rounded-full bg-warning-soft px-1.5 text-[9px] font-bold text-warning num">
+                                      {m.count}×
+                                    </span>
+                                  </div>
                                 </li>
                               ))}
                             </ul>

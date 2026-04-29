@@ -370,6 +370,11 @@ export function DailySummaryPanel({ visits }: Props) {
               })}
             </div>
           </div>
+
+          {/* Planos de ação (full-width) */}
+          <div className="md:col-span-3">
+            <ActionPlansPanel />
+          </div>
         </div>
       )}
     </section>

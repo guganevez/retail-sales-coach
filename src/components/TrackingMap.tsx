@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Building2, MapPin, Truck } from "lucide-react";
+import { Building2, Clock, MapPin, Radio, Truck } from "lucide-react";
 import { TrackedOrder, COMPANY, distanceKm } from "@/lib/tracking";
+import { useLiveVehicle, formatEta, formatClock } from "@/lib/liveVehicle";
 
 interface Props {
   order: TrackedOrder;
@@ -64,21 +65,27 @@ export function TrackingMap({ order }: Props) {
   const dest: [number, number] = [order.delivery.geo.lat, order.delivery.geo.lng];
   const vehicle = order.delivery.vehicle;
   const hasVehicle = !!vehicle && vehicle.plate !== "—" && order.status !== "entregue";
+
+  // Posição "ao vivo" — atualiza a cada novo ping (mock/Realtime)
+  const live = useLiveVehicle(order);
   const vehPos: [number, number] | null = hasVehicle
-    ? [vehicle!.geo.lat, vehicle!.geo.lng]
+    ? [live.geo.lat, live.geo.lng]
     : null;
 
   const points = useMemo<[number, number][]>(
     () => (vehPos ? [cd, vehPos, dest] : [cd, dest]),
-    [cd, dest, vehPos]
+    [cd[0], cd[1], dest[0], dest[1], vehPos?.[0], vehPos?.[1]]
   );
 
-  const distTotal = distanceKm(COMPANY.geo, order.delivery.geo);
+  const traveledPct = live.totalKm > 0
+    ? Math.min(100, ((live.totalKm - live.remainingKm) / live.totalKm) * 100)
+    : 0;
+
   const mapRef = useRef<L.Map | null>(null);
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-muted/30">
-      <div className="relative" style={{ height: 220 }}>
+      <div className="relative" style={{ height: 240 }}>
         <MapContainer
           ref={(m) => { mapRef.current = m; }}
           center={dest}
@@ -133,12 +140,38 @@ export function TrackingMap({ order }: Props) {
                 <strong>Veículo {vehicle!.plate}</strong>
                 <br />
                 Motorista: {vehicle!.driver}
+                <br />
+                <span className="text-xs">Atualizado {formatClock(live.updatedAt)}</span>
               </Popup>
             </Marker>
           )}
 
           <FitBounds points={points} />
         </MapContainer>
+
+        {/* HUD ao vivo sobreposto ao mapa — distância + ETA reativos */}
+        {hasVehicle && (
+          <div className="pointer-events-none absolute left-2 top-2 right-2 flex items-start justify-between gap-2">
+            <div className="rounded-lg bg-card/95 px-2.5 py-1.5 shadow-soft backdrop-blur">
+              <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                <Radio className="h-2.5 w-2.5 animate-pulse text-primary" /> Ao vivo
+              </p>
+              <p className="num text-sm font-bold text-foreground">
+                {live.remainingKm.toFixed(1)} km <span className="text-[10px] font-medium text-muted-foreground">restantes</span>
+              </p>
+              <p className="num text-[10px] text-muted-foreground">
+                de {live.totalKm.toFixed(1)} km · {traveledPct.toFixed(0)}%
+              </p>
+            </div>
+            <div className="rounded-lg bg-primary/95 px-2.5 py-1.5 text-primary-foreground shadow-glow backdrop-blur">
+              <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide opacity-80">
+                <Clock className="h-2.5 w-2.5" /> ETA
+              </p>
+              <p className="num text-sm font-bold">{formatEta(live.etaMinutes)}</p>
+              <p className="num text-[10px] opacity-80">chega {formatClock(live.etaAt)}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Legenda */}
@@ -146,13 +179,13 @@ export function TrackingMap({ order }: Props) {
         <span className="inline-flex items-center gap-1">
           <Building2 className="h-3 w-3 text-accent" /> CD São Paulo
         </span>
-        {hasVehicle && (
+        {hasVehicle ? (
           <span className="inline-flex items-center gap-1 font-bold text-primary">
-            <Truck className="h-3 w-3" /> {vehicle!.plate}
+            <Truck className="h-3 w-3" /> {vehicle!.plate} · {live.movingKmh} km/h
           </span>
-        )}
+        ) : null}
         <span className="inline-flex items-center gap-1">
-          <MapPin className="h-3 w-3 text-success" /> {distTotal.toFixed(0)} km destino
+          <MapPin className="h-3 w-3 text-success" /> {live.totalKm.toFixed(0)} km destino
         </span>
       </div>
     </div>
